@@ -1,0 +1,4312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>羽毛球计分板</title>
+<style>
+  :root {
+    --p1: #3b82f6;
+    --p1-dark: #1a2740;
+    --p2: #ef4444;
+    --p2-dark: #3d1717;
+    --bg: #09090c;
+    --text: #f1f5f9;
+    --muted: #64748b;
+    --serve: #22c55e;
+    --gold: #fbbf24;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  /* ===== Header ===== */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: #111118;
+    border-bottom: 1px solid #1e1e2e;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .match-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+    white-space: nowrap;
+  }
+
+  .game-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .game-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #2d2d3d;
+    border: 2px solid #3d3d4d;
+    transition: all 0.3s;
+  }
+
+  .game-dot.win-p1 { background: var(--p1); border-color: var(--p1); }
+  .game-dot.win-p2 { background: var(--p2); border-color: var(--p2); }
+  .game-dot.current { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.5); }
+
+  .status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+
+  .status-badge.live { background: #166534; color: #4ade80; }
+  .status-badge.over { background: #5c1a1a; color: #f87171; }
+
+  .header-history-btn {
+    background: #1a1a25;
+    border: 1px solid #2d2d3d;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .header-history-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  /* ===== Court Area ===== */
+  .court {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .player-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.3s;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+
+  .player-side:active {
+    transition: background 0.05s;
+  }
+
+  .p1 {
+    background: linear-gradient(180deg, #0b1424 0%, #152238 100%);
+    border-right: 2px solid #1e1e3a;
+  }
+
+  .p1:active { background: #1e3a6e; }
+
+  .p2 {
+    background: linear-gradient(180deg, #140b0b 0%, #2d1515 100%);
+    border-left: 2px solid #2d1e1e;
+  }
+
+  .p2:active { background: #5c1e1e; }
+
+  /* ===== Player Name ===== */
+  .player-name-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+
+  .player-name-area.singles {
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .player-name-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .player-name {
+    font-size: clamp(14px, 3.5vw, 20px);
+    font-weight: 700;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border: 1px dashed transparent;
+    transition: border 0.2s;
+  }
+
+  .p1 .player-name { color: #93c5fd; }
+  .p2 .player-name { color: #fca5a5; }
+
+  .edit-icon {
+    font-size: clamp(12px, 3vw, 16px);
+    opacity: 0.5;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  /* ===== Serve Indicator ===== */
+  .serve-area {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: clamp(11px, 2.5vw, 14px);
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    transition: all 0.3s;
+  }
+
+  .serve-active {
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--serve);
+    animation: servePulse 1.5s ease-in-out infinite;
+  }
+
+  .serve-inactive {
+    background: transparent;
+    color: transparent;
+    opacity: 0;
+  }
+
+  @keyframes servePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    50% { box-shadow: 0 0 12px 4px rgba(34, 197, 94, 0.15); }
+  }
+
+  .shuttlecock { font-size: clamp(14px, 4vw, 22px); }
+
+  /* ===== Score ===== */
+  .score {
+    font-size: clamp(72px, 22vw, 180px);
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255,255,255,0.2);
+  }
+
+  .score.pop {
+    animation: scorePop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes scorePop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.25); color: var(--gold); }
+    100% { transform: scale(1); }
+  }
+
+  /* ===== Games Won ===== */
+  .games-badge {
+    font-size: clamp(11px, 2.5vw, 15px);
+    font-weight: 600;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .games-badge span {
+    color: var(--gold);
+    font-weight: 700;
+  }
+
+  /* ===== Footer Controls ===== */
+  footer {
+    display: flex;
+    gap: 6px;
+    padding: 8px 8px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    background: #111118;
+    border-top: 1px solid #1e1e2e;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .ctrl-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 10px 6px;
+    border: 1px solid #2d2d3d;
+    border-radius: 10px;
+    background: #1a1a25;
+    color: #cbd5e1;
+    font-size: clamp(11px, 2.5vw, 13px);
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .ctrl-btn:active {
+    background: #2d2d3d;
+    border-color: #4d4d5d;
+    transform: scale(0.96);
+  }
+
+  .ctrl-btn.danger {
+    border-color: #5c1a1a;
+    color: #f87171;
+  }
+
+  .ctrl-btn.danger:active {
+    background: #3d1717;
+    border-color: #7c2a2a;
+  }
+
+  /* ===== Confirmation Modal ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 700;
+    padding: 20px;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: #1a1a25;
+    border: 1px solid #2d2d3d;
+    border-radius: 16px;
+    padding: 24px 20px;
+    text-align: center;
+    max-width: 320px;
+    width: 100%;
+  }
+
+  .modal-icon { font-size: 40px; margin-bottom: 8px; }
+
+  .modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .modal-text {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .modal-btns {
+    display: flex;
+    gap: 8px;
+  }
+
+  .modal-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .modal-btn.cancel {
+    background: #2d2d3d;
+    color: #cbd5e1;
+  }
+
+  .modal-btn.confirm {
+    background: #5c1a1a;
+    color: #fca5a5;
+  }
+
+  .modal-btn.primary {
+    background: var(--p1);
+    color: #fff;
+  }
+
+  /* ===== Game Win Modal ===== */
+  .gamewin-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    padding: 20px;
+  }
+
+  .gamewin-overlay.active { display: flex; }
+
+  .gamewin-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 340px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes modalIn {
+    0%   { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .gamewin-emoji { font-size: 52px; margin-bottom: 8px; }
+
+  .gamewin-title {
+    font-size: 22px;
+    font-weight: 900;
+    margin-bottom: 6px;
+    color: #fff;
+  }
+
+  .gamewin-score-final {
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--gold);
+    margin-bottom: 16px;
+    letter-spacing: 4px;
+  }
+
+  .gamewin-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    background: var(--gold);
+    color: #000;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .gamewin-btn:active {
+    transform: scale(0.96);
+    opacity: 0.85;
+  }
+
+  .gamewin-undo-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid #3d3d4d;
+    background: transparent;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .gamewin-undo-btn:active {
+    background: #2d2d3d;
+    color: #cbd5e1;
+  }
+
+  /* ===== History Overlay ===== */
+  .history-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: none;
+    flex-direction: column;
+    z-index: 200;
+  }
+
+  .history-overlay.active { display: flex; }
+
+  .history-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 500px;
+    width: 100%;
+    margin: 0 auto;
+    background: #111118;
+  }
+
+  .history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #1e1e2e;
+    flex-shrink: 0;
+  }
+
+  .history-header-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .history-close-btn {
+    background: none;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+
+  .history-close-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  .history-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #historyDetailView {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .history-empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 40px 0;
+    font-size: 14px;
+  }
+
+  /* Main game list */
+  .history-game-card {
+    background: #1a1a25;
+    border: 1px solid #2d2d3d;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .history-game-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .history-game-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .history-game-result {
+    font-size: 22px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 2px;
+  }
+
+  .history-game-winner {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .history-game-winner .p1-name { color: #93c5fd; }
+  .history-game-winner .p2-name { color: #fca5a5; }
+
+  .history-detail-btn {
+    background: #2d2d3d;
+    border: none;
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 8px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .history-detail-btn:active {
+    background: #3d3d4d;
+    color: #fff;
+  }
+
+  /* Detail view */
+  .detail-back-btn {
+    background: none;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+
+  .detail-back-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  .detail-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px 16px;
+  }
+
+  .detail-top {
+    flex-shrink: 0;
+    text-align: center;
+  }
+
+  .detail-header-info {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .detail-vs {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .flow-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    margin: 0 -16px;
+    padding: 0 16px;
+    box-shadow: inset 0 8px 8px -8px rgba(0,0,0,0.4), inset 0 -8px 8px -8px rgba(0,0,0,0.4);
+  }
+
+  .flow-scroll::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .flow-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .flow-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+  }
+
+  .detail-vs .p1-name { color: #93c5fd; }
+  .detail-vs .p2-name { color: #fca5a5; }
+
+  .flow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #1a1a25;
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .flow-row.flow-p0-scored {
+    border-left: 3px solid var(--p1);
+  }
+
+  .flow-row.flow-p1-scored {
+    border-left: 3px solid var(--p2);
+  }
+
+  .flow-row.flow-start {
+    border-left: 3px solid transparent;
+    opacity: 0.6;
+  }
+
+  .flow-score-p0 { color: #93c5fd; min-width: 24px; text-align: right; }
+  .flow-score-p1 { color: #fca5a5; min-width: 24px; text-align: left; }
+  .flow-colon { color: var(--muted); }
+  .flow-who {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    min-width: 56px;
+    text-align: center;
+  }
+
+  .flow-final {
+    flex-shrink: 0;
+    text-align: center;
+    padding: 10px;
+    background: #1a1a25;
+    border: 1px solid #2d2d3d;
+    border-radius: 10px;
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: 3px;
+  }
+
+  /* ===== Victory Overlay ===== */
+  .victory-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    z-index: 300;
+    gap: 12px;
+  }
+
+  .victory-overlay.active { display: flex; }
+
+  .victory-trophy { font-size: 64px; }
+
+  .victory-text {
+    font-size: clamp(24px, 6vw, 36px);
+    font-weight: 900;
+    text-align: center;
+    padding: 0 20px;
+  }
+
+  .victory-score {
+    font-size: clamp(16px, 4vw, 22px);
+    color: var(--muted);
+    white-space: pre-line;
+    text-align: center;
+    line-height: 1.6;
+    padding: 0 16px;
+  }
+
+  .victory-btn {
+    margin-top: 12px;
+    padding: 12px 32px;
+    border-radius: 12px;
+    border: none;
+    background: var(--gold);
+    color: #000;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .victory-undo-btn {
+    margin-top: 8px;
+    padding: 8px 24px;
+    border-radius: 10px;
+    border: 1px solid #3d3d4d;
+    background: transparent;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .victory-undo-btn:active {
+    background: #2d2d3d;
+    color: #cbd5e1;
+  }
+
+  /* ===== Sponsor / Support ===== */
+  .sponsor-btn {
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px;
+    border: none;
+    background: transparent;
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    opacity: 0.8;
+  }
+
+  .sponsor-btn:hover { opacity: 1; }
+
+  .sponsor-btn:active {
+    opacity: 1;
+    color: #f59e0b;
+  }
+
+  .sponsor-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 650;
+    padding: 20px;
+  }
+
+  .sponsor-overlay.active { display: flex; }
+
+  .sponsor-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 320px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .sponsor-icon { font-size: 40px; margin-bottom: 8px; }
+
+  .sponsor-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .sponsor-qr {
+    width: 180px;
+    height: auto;
+    border-radius: 12px;
+    display: block;
+    margin: 12px auto;
+    border: 2px solid #2d2d3d;
+  }
+
+  .sponsor-thanks {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 14px;
+    padding: 0 8px;
+  }
+
+  .sponsor-close-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #3d3d4d;
+    background: #2d2d3d;
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .sponsor-close-btn:active {
+    background: #3d3d4d;
+    color: #fff;
+    transform: scale(0.96);
+  }
+
+  /* ===== Recovery Prompt Overlay ===== */
+  .recovery-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    padding: 20px;
+  }
+
+  .recovery-overlay.active { display: flex; }
+
+  .recovery-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 370px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .recovery-icon { font-size: 48px; margin-bottom: 10px; }
+
+  .recovery-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .recovery-text {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+
+  .recovery-summary {
+    background: #111118;
+    border: 1px solid #2d2d3d;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+
+  .recovery-summary .rs-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .recovery-btns {
+    display: flex;
+    gap: 8px;
+  }
+
+  .recovery-btn {
+    flex: 1;
+    padding: 13px 10px;
+    border-radius: 10px;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .recovery-btn:active { transform: scale(0.96); }
+
+  .recovery-btn.primary {
+    background: var(--gold);
+    color: #000;
+  }
+
+  .recovery-btn.danger {
+    background: #2a1218;
+    color: #fca5a5;
+    border: 1px solid #5c1a1a;
+  }
+
+  /* ===== About / Contact Overlay ===== */
+  .about-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 250;
+    padding: 20px;
+  }
+
+  .about-overlay.active { display: flex; }
+
+  .about-card {
+    position: relative;
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 370px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .about-icon { font-size: 48px; margin-bottom: 10px; }
+
+  .about-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+
+  .about-text {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    line-height: 1.8;
+    text-align: left;
+    padding: 0 4px;
+  }
+
+  .about-text a {
+    color: #60a5fa;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-all;
+  }
+
+  .about-text a:active {
+    color: #93c5fd;
+  }
+
+  .about-close-btn {
+    width: 100%;
+    padding: 13px;
+    border-radius: 10px;
+    border: 1px solid #3d3d4d;
+    background: #2d2d3d;
+    color: #cbd5e1;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .about-close-btn:active {
+    background: #3d3d4d;
+    color: #fff;
+    transform: scale(0.96);
+  }
+
+  /* ===== Mode Selection Overlay ===== */
+  .mode-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 620;
+    padding: 20px;
+  }
+
+  .mode-overlay.active { display: flex; }
+
+  .mode-card {
+    position: relative;
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 340px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .guide-open-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: #1e1e2e;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .guide-open-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  .guide-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 630;
+    padding: 16px;
+  }
+
+  .guide-overlay.active { display: flex; }
+
+  .guide-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    max-width: 400px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .guide-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-shrink: 0;
+  }
+
+  .guide-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  .guide-close-btn {
+    background: #1e1e2e;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 18px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .guide-close-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  .guide-body {
+    overflow-y: auto;
+    max-height: calc(80vh - 80px);
+    padding-right: 4px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #cbd5e1;
+  }
+
+  .guide-body .guide-section {
+    margin-bottom: 14px;
+  }
+
+  .guide-body .guide-section-title {
+    font-weight: 700;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+
+  .guide-body ul {
+    padding-left: 16px;
+    margin: 0;
+    color: #94a3b8;
+  }
+
+  .guide-body li {
+    margin-bottom: 2px;
+  }
+
+  .mode-icon { font-size: 48px; margin-bottom: 10px; }
+
+  .mode-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 18px;
+  }
+
+  .mode-btns {
+    display: flex;
+    gap: 12px;
+  }
+
+  .mode-btn {
+    flex: 1;
+    padding: 18px 12px;
+    border-radius: 14px;
+    border: 2px solid #3d3d4d;
+    background: #111118;
+    color: #e2e8f0;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .mode-btn:hover { border-color: #5d5d6d; }
+
+  .mode-btn:active {
+    transform: scale(0.95);
+    border-color: var(--gold);
+  }
+
+  .mode-btn .mode-sub {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ===== Doubles Name Layout ===== */
+  .doubles-names {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .doubles-names .player-name-row {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .doubles-names .player-name {
+    font-size: clamp(12px, 3vw, 17px);
+    max-width: 35vw;
+  }
+
+  .serve-badge {
+    font-size: clamp(10px, 2.5vw, 14px);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .serve-badge.active-server { opacity: 1; }
+  .serve-badge.active-receiver { opacity: 1; }
+
+  /* ===== Scoring System Selection Overlay ===== */
+  .scoring-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 600;
+    padding: 20px;
+  }
+
+  .scoring-overlay.active { display: flex; }
+
+  .scoring-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 340px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .scoring-icon { font-size: 48px; margin-bottom: 10px; }
+
+  .scoring-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 18px;
+  }
+
+  .scoring-btns {
+    display: flex;
+    gap: 12px;
+  }
+
+  .scoring-btn {
+    flex: 1;
+    padding: 18px 12px;
+    border-radius: 14px;
+    border: 2px solid #3d3d4d;
+    background: #111118;
+    color: #e2e8f0;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .scoring-btn:hover {
+    border-color: #5d5d6d;
+  }
+
+  .scoring-btn:active {
+    transform: scale(0.95);
+    border-color: var(--gold);
+  }
+
+  .scoring-btn .scoring-sub {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ===== Back Button (shared) ===== */
+  .back-btn {
+    display: inline-block;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    margin-bottom: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .back-btn:hover {
+    background: rgba(255,255,255,0.10);
+    color: #cbd5e1;
+  }
+
+  .back-btn:active {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    transform: scale(0.97);
+  }
+
+  /* ===== Doubles Type Selection Overlay ===== */
+  .doubles-type-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 625;
+    padding: 20px;
+  }
+
+  .doubles-type-overlay.active { display: flex; }
+
+  .doubles-type-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .doubles-type-icon { font-size: 48px; margin-bottom: 10px; }
+
+  .doubles-type-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 18px;
+  }
+
+  .doubles-type-btns {
+    display: flex;
+    gap: 12px;
+  }
+
+  .doubles-type-btn {
+    flex: 1;
+    padding: 18px 8px;
+    border-radius: 14px;
+    border: 2px solid #3d3d4d;
+    background: #111118;
+    color: #e2e8f0;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .doubles-type-btn:hover { border-color: #5d5d6d; }
+
+  .doubles-type-btn:active {
+    transform: scale(0.95);
+    border-color: var(--gold);
+  }
+
+  .doubles-type-btn .doubles-type-sub {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ===== Serve Setup Overlay (Doubles) ===== */
+  .serve-setup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 610;
+    padding: 20px;
+  }
+
+  .serve-setup-overlay.active { display: flex; }
+
+  .serve-setup-card {
+    background: #1a1a25;
+    border: 1px solid #3d3d4d;
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    text-align: center;
+    max-width: 420px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: modalIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .serve-setup-icon { font-size: 48px; margin-bottom: 6px; }
+
+  .serve-setup-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 18px;
+  }
+
+  .serve-section {
+    text-align: left;
+    margin-bottom: 16px;
+  }
+
+  .serve-section-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding-left: 2px;
+  }
+
+  .serve-player-options {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .serve-player-tile {
+    flex: 1;
+    min-width: calc(50% - 4px);
+    padding: 14px 10px;
+    border-radius: 12px;
+    border: 2px solid #3d3d4d;
+    background: #111118;
+    color: #e2e8f0;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    overflow-wrap: anywhere;
+  }
+
+  .serve-player-tile:active {
+    transform: scale(0.96);
+  }
+
+  .serve-player-tile.server-selected {
+    border-color: var(--p1);
+    background: rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+    color: #93c5fd;
+  }
+
+  .serve-player-tile.receiver-selected {
+    border-color: var(--p2);
+    background: rgba(239, 68, 68, 0.15);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
+  }
+
+  .serve-player-tile.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+  }
+
+  .serve-player-tile .tile-team-tag {
+    display: block;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .serve-setup-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .serve-setup-btn {
+    width: 100%;
+    padding: 15px 12px;
+    border-radius: 14px;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .serve-setup-btn:active {
+    transform: scale(0.96);
+  }
+
+  .serve-setup-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .serve-setup-btn:disabled:active {
+    transform: none;
+  }
+
+  .serve-setup-btn.quick-start {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #000;
+    font-size: 15px;
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  }
+
+  .serve-setup-btn.quick-start:active {
+    opacity: 0.85;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+  }
+
+  .serve-setup-btn.confirm {
+    background: var(--p1);
+    color: #fff;
+    border: 2px solid #4b9af6;
+  }
+
+  .serve-setup-btn.confirm:active {
+    background: #2563eb;
+  }
+
+  /* ===== Chart in Detail View ===== */
+  .chart-toggle-btn {
+    display: inline-block;
+    margin: 8px auto 0;
+    padding: 6px 14px;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    background: #1a1a25;
+    color: #fbbf24;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .chart-toggle-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  .chart-container {
+    display: none;
+    width: 100%;
+    margin: 12px 0;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid #2d2d3d;
+    border-radius: 10px;
+  }
+
+  .chart-container.active {
+    display: block;
+  }
+
+  #gameChart {
+    width: 100%;
+    max-height: 320px;
+  }
+
+  .chart-export-wrap {
+    display: none;
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  .chart-export-wrap.active {
+    display: block;
+  }
+
+  .chart-export-btn {
+    display: inline-block;
+    padding: 6px 16px;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    background: #1a1a25;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .chart-export-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  /* ===== Match Archive List (Level 1) ===== */
+  .history-match-card {
+    background: #1a1a25;
+    border: 1px solid #2d2d3d;
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .history-match-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .history-match-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .history-match-date {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .history-match-vs {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .history-match-vs .m-p1 { color: #93c5fd; }
+  .history-match-vs .m-p2 { color: #fca5a5; }
+
+  .history-match-total {
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: 3px;
+    flex-shrink: 0;
+    margin-left: 10px;
+  }
+
+  .history-match-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .match-action-btn {
+    flex: 1;
+    padding: 7px 8px;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    background: #1a1a25;
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .match-action-btn:active {
+    transform: scale(0.96);
+    opacity: 0.85;
+  }
+
+  .match-action-btn.view { border-color: #3b82f6; color: #93c5fd; }
+  .match-action-btn.view:active { background: #1a2740; }
+  .match-action-btn.export { border-color: #22c55e; color: #4ade80; }
+  .match-action-btn.export:active { background: #14532d; }
+  .match-action-btn.delete { border-color: #5c1a1a; color: #f87171; }
+  .match-action-btn.delete:active { background: #3d1717; }
+
+  .match-current-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border: 1px dashed #3d3d4d;
+    border-radius: 10px;
+    background: #1a1a25;
+    color: #fbbf24;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .match-current-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+    border-color: #5d5d6d;
+  }
+
+  .history-back-main-btn {
+    background: none;
+    border: 1px solid #3d3d4d;
+    border-radius: 8px;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .history-back-main-btn:active {
+    background: #2d2d3d;
+    color: #fff;
+  }
+
+  /* ===== Export Report Card (off-screen) ===== */
+  .export-card-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .export-card {
+    width: 400px;
+    padding: 24px 28px;
+    background: #111118;
+    border: 2px solid #2d2d3d;
+    border-radius: 16px;
+    color: #f1f5f9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .export-card-title {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+
+  .export-card-date {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .export-card-vs {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .export-card-vs .p1c { color: #93c5fd; }
+  .export-card-vs .p2c { color: #fca5a5; }
+
+  .export-card-final {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--gold);
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+  }
+
+  .export-card-games {
+    border-top: 1px solid #2d2d3d;
+    padding-top: 12px;
+  }
+
+  .export-card-game-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 4px 0;
+  }
+
+  .export-card-game-label {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .export-card-game-score {
+    color: #fff;
+    letter-spacing: 2px;
+  }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <span class="match-title">🏸 羽毛球计分</span>
+    <div class="game-dots" id="gameDots">
+      <div class="game-dot current" data-game="1"></div>
+      <div class="game-dot" data-game="2"></div>
+      <div class="game-dot" data-game="3"></div>
+    </div>
+    <button class="header-history-btn" id="historyOpenBtn">📋 历史</button>
+    <button class="header-history-btn" id="aboutOpenBtn">📬 关于</button>
+    <span class="status-badge live" id="statusBadge">进行中</span>
+  </header>
+
+  <!-- Court -->
+  <main class="court">
+    <!-- Player 1 / Team A -->
+    <div class="player-side p1" id="side0">
+      <div class="player-name-area" id="nameArea0">
+        <div class="player-name-row" id="nameRow0a">
+          <span class="player-name" id="name0a">球员 A</span>
+          <span class="edit-icon" id="edit0a">✏️</span>
+          <span class="serve-badge" id="serveBadge0a">🏸</span>
+        </div>
+        <div class="player-name-row" id="nameRow0b" style="display:none;">
+          <span class="player-name" id="name0b">球员 A2</span>
+          <span class="edit-icon" id="edit0b">✏️</span>
+          <span class="serve-badge" id="serveBadge0b">🛡️</span>
+        </div>
+      </div>
+      <div class="serve-area serve-active" id="serve0">
+        <span class="shuttlecock">🏸</span>
+        <span class="serve-court" id="court0">右区发球</span>
+      </div>
+      <div class="score" id="score0">0</div>
+      <div class="games-badge">局胜 <span id="games0">0</span></div>
+    </div>
+
+    <!-- Player 2 / Team B -->
+    <div class="player-side p2" id="side1">
+      <div class="player-name-area" id="nameArea1">
+        <div class="player-name-row" id="nameRow1a">
+          <span class="player-name" id="name1a">球员 B</span>
+          <span class="edit-icon" id="edit1a">✏️</span>
+          <span class="serve-badge" id="serveBadge1a">🏸</span>
+        </div>
+        <div class="player-name-row" id="nameRow1b" style="display:none;">
+          <span class="player-name" id="name1b">球员 B2</span>
+          <span class="edit-icon" id="edit1b">✏️</span>
+          <span class="serve-badge" id="serveBadge1b">🛡️</span>
+        </div>
+      </div>
+      <div class="serve-area serve-inactive" id="serve1">
+        <span class="shuttlecock">🏸</span>
+        <span class="serve-court" id="court1">右区发球</span>
+      </div>
+      <div class="score" id="score1">0</div>
+      <div class="games-badge">局胜 <span id="games1">0</span></div>
+    </div>
+  </main>
+
+  <!-- Controls -->
+  <footer>
+    <button class="ctrl-btn" id="undoBtn">↩ 撤销</button>
+    <button class="ctrl-btn" id="switchBtn">⇄ 换边</button>
+    <button class="ctrl-btn danger" id="resetGameBtn">↺ 重置本局</button>
+    <button class="ctrl-btn danger" id="resetMatchBtn">⤫ 重置比赛</button>
+  </footer>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-icon" id="modalIcon">⚠️</div>
+    <div class="modal-title" id="modalTitle">确认操作</div>
+    <div class="modal-text" id="modalText">确定要执行此操作吗？</div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" id="modalCancel">取消</button>
+      <button class="modal-btn confirm" id="modalConfirm">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- Game Win Modal (single game, not match) -->
+<div class="gamewin-overlay" id="gamewinOverlay">
+  <div class="gamewin-card">
+    <div class="gamewin-emoji" id="gamewinEmoji">🏅</div>
+    <div class="gamewin-title" id="gamewinTitle"></div>
+    <div class="gamewin-score-final" id="gamewinScore"></div>
+    <button class="gamewin-btn" id="gamewinBtn">进入下一局</button>
+    <button class="gamewin-undo-btn" id="gamewinUndoBtn">↩ 撤销误触</button>
+    <button class="sponsor-btn" id="gamewinSponsorBtn">觉得好用？请作者喝杯咖啡 ☕</button>
+  </div>
+</div>
+
+<!-- Export Report Card (off-screen for html2canvas capture) -->
+<div class="export-card-container" id="exportCardContainer">
+  <div class="export-card" id="exportCard"></div>
+</div>
+
+<!-- History Overlay -->
+<div class="history-overlay" id="historyOverlay">
+  <div class="history-panel">
+    <!-- Level 1: Match Archive List -->
+    <div id="historyMatchListView">
+      <div class="history-header">
+        <span class="history-header-title">📋 历史赛事归档</span>
+        <button class="history-close-btn" id="historyCloseBtn2">关闭</button>
+      </div>
+      <div class="history-body" id="historyMatchBody">
+        <div class="history-empty" id="historyMatchEmpty">暂无已归档的赛事</div>
+      </div>
+    </div>
+    <!-- Level 2: Game List (single match) -->
+    <div id="historyMainView" style="display:none;">
+      <div class="history-header">
+        <button class="history-back-main-btn" id="historyBackMainBtn">← 返回归档</button>
+        <span class="history-header-title" id="historyMainTitle">📋 比赛记录</span>
+        <button class="history-close-btn" id="historyCloseBtn">关闭</button>
+      </div>
+      <div class="history-body" id="historyBody">
+        <div class="history-empty" id="historyEmpty">暂无已结束的局</div>
+      </div>
+    </div>
+    <!-- Level 3: Detail view (hidden by default) -->
+    <div id="historyDetailView" style="display:none;">
+      <div class="history-header">
+        <button class="detail-back-btn" id="detailBackBtn">← 返回</button>
+        <span class="history-header-title" id="detailTitle">得分流水</span>
+        <button class="history-close-btn" id="detailCloseBtn">关闭</button>
+      </div>
+      <div class="detail-body" id="detailBody">
+        <div class="detail-top">
+          <div class="detail-header-info" id="detailGameLabel"></div>
+          <div class="detail-vs" id="detailPlayers"></div>
+          <button class="chart-toggle-btn" id="chartToggleBtn">查看趋势图表 📊</button>
+        </div>
+        <div class="chart-container" id="chartContainer">
+          <canvas id="gameChart"></canvas>
+          <div class="chart-export-wrap" id="chartExportWrap">
+            <button class="chart-export-btn" id="chartExportBtn">📷 导出为图片</button>
+          </div>
+        </div>
+        <div class="flow-scroll" id="flowScroll">
+          <div class="flow-list" id="flowList"></div>
+        </div>
+        <div class="flow-final" id="flowFinal"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Victory Overlay -->
+<div class="victory-overlay" id="victoryOverlay">
+  <div class="victory-trophy">🏆</div>
+  <div class="victory-text" id="victoryText"></div>
+  <div class="victory-score" id="victoryScore"></div>
+  <button class="victory-btn" id="victoryBtn">开始新比赛</button>
+  <button class="victory-undo-btn" id="victoryUndoBtn">↩ 撤销误触</button>
+  <button class="sponsor-btn" id="victorySponsorBtn">觉得好用？请作者喝杯咖啡 ☕</button>
+</div>
+
+<!-- About / Contact Overlay -->
+<div class="about-overlay" id="aboutOverlay">
+  <div class="about-card">
+    <button id="aboutGuideBtn" class="guide-open-btn">使用说明 📖</button>
+    <div class="about-icon">📬</div>
+    <div class="about-title">关于 / 联系我们</div>
+    <div class="about-text">
+      由个人开发者 @boxi 开发，勘误及功能建议请联系 <a href="mailto:suiboxi@qq.com">suiboxi@qq.com</a>，感谢您的宝贵建议！本计分板不定期进行功能升级及更新！
+    </div>
+    <button class="about-close-btn" id="aboutCloseBtn">关闭</button>
+  </div>
+</div>
+
+<!-- Mode Selection Overlay (Singles / Doubles) -->
+<div class="mode-overlay" id="modeOverlay">
+  <div class="mode-card">
+    <button id="guideOpenBtn" class="guide-open-btn">使用说明 📖</button>
+    <div class="mode-icon">🏸</div>
+    <div class="mode-title">请选择比赛模式</div>
+    <div class="mode-btns">
+      <button class="mode-btn" id="modeSinglesBtn">
+        单打
+        <span class="mode-sub">1 vs 1</span>
+      </button>
+      <button class="mode-btn" id="modeDoublesBtn">
+        双打
+        <span class="mode-sub">2 vs 2</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Scoring System Selection Overlay -->
+<div class="scoring-overlay" id="scoringOverlay">
+  <div class="scoring-card">
+    <button class="back-btn" id="scoringBackBtn">← 返回上一步</button>
+    <div class="scoring-icon">🏸</div>
+    <div class="scoring-title">请选择比赛赛制</div>
+    <div class="scoring-btns">
+      <button class="scoring-btn" id="scoring21Btn">
+        21分制
+        <span class="scoring-sub">封顶30分</span>
+      </button>
+      <button class="scoring-btn" id="scoring15Btn">
+        15分制
+        <span class="scoring-sub">封顶21分</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Doubles Type Selection Overlay -->
+<div class="doubles-type-overlay" id="doublesTypeOverlay">
+  <div class="doubles-type-card">
+    <button class="back-btn" id="doublesTypeBackBtn">← 返回上一步</button>
+    <div class="doubles-type-icon">🏸</div>
+    <div class="doubles-type-title">请选择双打类型</div>
+    <div class="doubles-type-btns">
+      <button class="doubles-type-btn" id="doublesTypeMenBtn">
+        男双
+        <span class="doubles-type-sub">两男 vs 两男</span>
+      </button>
+      <button class="doubles-type-btn" id="doublesTypeWomenBtn">
+        女双
+        <span class="doubles-type-sub">两女 vs 两女</span>
+      </button>
+      <button class="doubles-type-btn" id="doublesTypeMixedBtn">
+        混双
+        <span class="doubles-type-sub">男女混搭</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Serve Setup Overlay (Doubles First Serve & Receive) -->
+<div class="serve-setup-overlay" id="serveSetupOverlay">
+  <div class="serve-setup-card">
+    <button class="back-btn" id="serveSetupBackBtn">← 返回上一步</button>
+    <div class="serve-setup-icon">🏸</div>
+    <div class="serve-setup-title">请指定首发与接发球员</div>
+
+    <div class="serve-section">
+      <div class="serve-section-label">选择首发球员</div>
+      <div class="serve-player-options" id="serverOptions"></div>
+    </div>
+
+    <div class="serve-section">
+      <div class="serve-section-label">选择首接球员</div>
+      <div class="serve-player-options" id="receiverOptions"></div>
+    </div>
+
+    <div class="serve-setup-btns">
+      <button class="serve-setup-btn quick-start" id="quickStartBtn">⚡ 快速开始：默认A1发给B1</button>
+      <button class="serve-setup-btn confirm" id="startDoublesMatchBtn">✓ 确认配置并开始</button>
+    </div>
+  </div>
+</div>
+
+<!-- Recovery Prompt Overlay -->
+<div class="recovery-overlay" id="recoveryOverlay">
+  <div class="recovery-card">
+    <div class="recovery-icon">💾</div>
+    <div class="recovery-title">检测到未完成的比赛记录</div>
+    <div class="recovery-text">已为您自动恢复比赛数据。如需开始全新的比赛，请点击下方按钮清空记录。</div>
+    <div class="recovery-summary" id="recoverySummary"></div>
+    <div class="recovery-btns">
+      <button class="recovery-btn danger" id="recoveryClearBtn">清空并开启新局</button>
+      <button class="recovery-btn primary" id="recoveryResumeBtn">继续当前比赛</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sponsor / Support Overlay -->
+<div class="sponsor-overlay" id="sponsorOverlay">
+  <div class="sponsor-card">
+    <div class="sponsor-icon">☕</div>
+    <div class="sponsor-title">请作者喝杯咖啡</div>
+    <img class="sponsor-qr" src="data:image/jpeg;base64,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" alt="赞赏二维码">
+    <div class="sponsor-thanks">感谢您的支持！我们会不断改进，并制作更多实用的工具！</div>
+    <button class="sponsor-close-btn" id="sponsorCloseBtn">关闭</button>
+  </div>
+</div>
+
+<!-- Guide / Instructions Overlay -->
+<div class="guide-overlay" id="guideOverlay">
+  <div class="guide-card">
+    <div class="guide-header">
+      <span class="guide-title">使用说明 📖</span>
+      <button class="guide-close-btn" id="guideCloseBtn">✕</button>
+    </div>
+    <div class="guide-body">
+      <div class="guide-section">
+        <div class="guide-section-title">计分操作</div>
+        <div>点击屏幕左右两侧即可为对应队伍加分。</div>
+      </div>
+      <div class="guide-section">
+        <div class="guide-section-title">发球提示</div>
+        <div>名字旁带有 🏸 图标的为当前发球员，带有 🛡️ 图标的为接发球员。下方会提示具体的发球半区（左区/右区）。</div>
+      </div>
+      <div class="guide-section">
+        <div class="guide-section-title">双打智能轮转</div>
+        <div>系统已内置国际羽联双打规则：连得分时，得分方两名队员互换物理站位；夺回发球权时，双方物理站位不变，根据奇偶分自动分配发球权。</div>
+      </div>
+      <div class="guide-section">
+        <div class="guide-section-title">修改名字</div>
+        <div>点击任意球员的名字，即可随时修改名称。</div>
+      </div>
+      <div class="guide-section">
+        <div class="guide-section-title">赛事复盘</div>
+        <div>点击顶部"历史"按钮，可查看过往赛事的每一分流水，支持生成趋势折线图，并可一键导出带有比分的精美战报图片。</div>
+      </div>
+      <div class="guide-section">
+        <div class="guide-section-title">防丢失机制</div>
+        <div>数据自动保存在本地，意外刷新或关闭网页，重新打开后可一键恢复当前比赛进度。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── DOM refs ────────────────────────────────────
+  const $ = (id) => document.getElementById(id);
+  const side0   = $('side0');
+  const side1   = $('side1');
+  const name0a  = $('name0a');
+  const name0b  = $('name0b');
+  const name1a  = $('name1a');
+  const name1b  = $('name1b');
+  const edit0a  = $('edit0a');
+  const edit0b  = $('edit0b');
+  const edit1a  = $('edit1a');
+  const edit1b  = $('edit1b');
+  const serveBadge0a = $('serveBadge0a');
+  const serveBadge0b = $('serveBadge0b');
+  const serveBadge1a = $('serveBadge1a');
+  const serveBadge1b = $('serveBadge1b');
+  const nameRow0a = $('nameRow0a');
+  const nameRow0b = $('nameRow0b');
+  const nameRow1a = $('nameRow1a');
+  const nameRow1b = $('nameRow1b');
+  const score0  = $('score0');
+  const score1  = $('score1');
+  const games0  = $('games0');
+  const games1  = $('games1');
+  const serve0  = $('serve0');
+  const serve1  = $('serve1');
+  const court0  = $('court0');
+  const court1  = $('court1');
+  const gameDots    = $('gameDots');
+  const statusBadge = $('statusBadge');
+  const modalOverlay    = $('modalOverlay');
+  const modalIcon       = $('modalIcon');
+  const modalTitle      = $('modalTitle');
+  const modalText       = $('modalText');
+  const modalCancel     = $('modalCancel');
+  const modalConfirm    = $('modalConfirm');
+  const gamewinOverlay  = $('gamewinOverlay');
+  const gamewinEmoji    = $('gamewinEmoji');
+  const gamewinTitle    = $('gamewinTitle');
+  const gamewinScore    = $('gamewinScore');
+  const gamewinBtn      = $('gamewinBtn');
+  const gamewinUndoBtn  = $('gamewinUndoBtn');
+  const historyOverlay    = $('historyOverlay');
+  const historyMainView   = $('historyMainView');
+  const historyDetailView = $('historyDetailView');
+  const historyBody       = $('historyBody');
+  const historyEmpty      = $('historyEmpty');
+  const detailTitle       = $('detailTitle');
+  const detailGameLabel   = $('detailGameLabel');
+  const detailPlayers     = $('detailPlayers');
+  const flowList          = $('flowList');
+  const flowFinal         = $('flowFinal');
+  const flowScroll        = $('flowScroll');
+  const victoryOverlay  = $('victoryOverlay');
+  const victoryText     = $('victoryText');
+  const victoryScore    = $('victoryScore');
+  const victoryUndoBtn  = $('victoryUndoBtn');
+  const recoveryOverlay    = $('recoveryOverlay');
+  const recoverySummary    = $('recoverySummary');
+  const recoveryResumeBtn  = $('recoveryResumeBtn');
+  const recoveryClearBtn   = $('recoveryClearBtn');
+  const aboutOverlay    = $('aboutOverlay');
+  const aboutOpenBtn    = $('aboutOpenBtn');
+  const aboutGuideBtn   = $('aboutGuideBtn');
+  const aboutCloseBtn   = $('aboutCloseBtn');
+  const modeOverlay      = $('modeOverlay');
+  const modeSinglesBtn   = $('modeSinglesBtn');
+  const modeDoublesBtn   = $('modeDoublesBtn');
+  const scoringOverlay    = $('scoringOverlay');
+  const scoring21Btn      = $('scoring21Btn');
+  const scoring15Btn      = $('scoring15Btn');
+  const doublesTypeOverlay    = $('doublesTypeOverlay');
+  const doublesTypeMenBtn     = $('doublesTypeMenBtn');
+  const doublesTypeWomenBtn   = $('doublesTypeWomenBtn');
+  const doublesTypeMixedBtn   = $('doublesTypeMixedBtn');
+  const sponsorOverlay    = $('sponsorOverlay');
+  const sponsorCloseBtn   = $('sponsorCloseBtn');
+  const gamewinSponsorBtn = $('gamewinSponsorBtn');
+  const victorySponsorBtn = $('victorySponsorBtn');
+  const guideOverlay      = $('guideOverlay');
+  const guideOpenBtn      = $('guideOpenBtn');
+  const guideCloseBtn     = $('guideCloseBtn');
+  const chartToggleBtn   = $('chartToggleBtn');
+  const chartContainer   = $('chartContainer');
+  const gameChart        = $('gameChart');
+  const chartExportWrap  = $('chartExportWrap');
+  const chartExportBtn   = $('chartExportBtn');
+  const historyMatchListView = $('historyMatchListView');
+  const historyMatchBody     = $('historyMatchBody');
+  const historyMatchEmpty    = $('historyMatchEmpty');
+  const historyBackMainBtn   = $('historyBackMainBtn');
+  const historyMainTitle     = $('historyMainTitle');
+  const exportCardContainer  = $('exportCardContainer');
+  const exportCard           = $('exportCard');
+  const serveSetupOverlay       = $('serveSetupOverlay');
+  const serveSetupBackBtn       = $('serveSetupBackBtn');
+  const serverOptions           = $('serverOptions');
+  const receiverOptions         = $('receiverOptions');
+  const quickStartBtn           = $('quickStartBtn');
+  const startDoublesMatchBtn    = $('startDoublesMatchBtn');
+
+  // ── State ───────────────────────────────────────
+  const STORAGE_KEY = 'badminton_scoreboard_v4';
+
+  function createState() {
+    return {
+      mode: null,               // 'singles' or 'doubles' (null until selected)
+      doublesType: null,        // 'men' | 'women' | 'mixed' (only for doubles)
+      players: [                // 0,1 = Team A ; 2,3 = Team B
+        { name: '球员 A', points: 0, games: 0 },
+        { name: '球员 A2', points: 0, games: 0 },
+        { name: '球员 B', points: 0, games: 0 },
+        { name: '球员 B2', points: 0, games: 0 }
+      ],
+      // For singles: servingPlayer ∈ {0,2}; for doubles: activeServer ∈ {0,1,2,3}
+      servingPlayer: 0,         // singles serving player index (legacy + active in singles)
+      activeServer: null,       // doubles: index of current server (0-3)
+      activeReceiver: null,     // doubles: index of current receiver (0-3)
+      positions: ['right','left','right','left'], // doubles: each player's court side ('left'/'right')
+      currentGame: 1,
+      matchOver: false,
+      gamePaused: false,
+      isSwapped: false,
+      gameResults: [null, null, null],
+      gameScores: [],
+      pointLogs: [
+        [{p0: 0, p1: 0}],
+        [{p0: 0, p1: 0}],
+        [{p0: 0, p1: 0}]
+      ],
+      winScore: null
+    };
+  }
+
+  function normalizePlayer(player, fallback) {
+    player = player || {};
+    return {
+      name: player.name == null || player.name === '' ? fallback.name : String(player.name),
+      points: Number.isFinite(Number(player.points)) ? Number(player.points) : 0,
+      games: Number.isFinite(Number(player.games)) ? Number(player.games) : 0
+    };
+  }
+
+  function normalizeScoreEntry(score) {
+    if (!score) return null;
+    var p0 = Number(score.p0);
+    var p1 = Number(score.p1);
+    if (!Number.isFinite(p0) || !Number.isFinite(p1)) return null;
+    return { p0: p0, p1: p1 };
+  }
+
+  function normalizePointLog(log) {
+    if (!Array.isArray(log)) return [{ p0: 0, p1: 0 }];
+    var clean = log.map(normalizeScoreEntry).filter(Boolean);
+    return clean.length > 0 ? clean : [{ p0: 0, p1: 0 }];
+  }
+
+  function normalizeScoreboardState(source) {
+    var defaults = createState();
+    var s = source && typeof source === 'object' ? JSON.parse(JSON.stringify(source)) : {};
+    var oldPlayers = Array.isArray(s.players) ? s.players : defaults.players;
+
+    s.mode = s.mode === 'doubles' || s.mode === 'singles' ? s.mode : (s.mode == null ? null : 'singles');
+    s.doublesType = s.doublesType === undefined ? null : s.doublesType;
+
+    if (!Array.isArray(s.players) || s.players.length < 4) {
+      s.players = [
+        normalizePlayer(oldPlayers[0], defaults.players[0]),
+        normalizePlayer(oldPlayers[1] && oldPlayers.length > 2 ? oldPlayers[1] : null, defaults.players[1]),
+        normalizePlayer(oldPlayers.length > 2 ? oldPlayers[2] : oldPlayers[1], defaults.players[2]),
+        normalizePlayer(oldPlayers[3], defaults.players[3])
+      ];
+      if (source && source.servingPlayer === 1 && oldPlayers.length <= 2) s.servingPlayer = 2;
+    } else {
+      s.players = [
+        normalizePlayer(oldPlayers[0], defaults.players[0]),
+        normalizePlayer(oldPlayers[1], defaults.players[1]),
+        normalizePlayer(oldPlayers[2], defaults.players[2]),
+        normalizePlayer(oldPlayers[3], defaults.players[3])
+      ];
+    }
+
+    s.servingPlayer = [0, 1, 2, 3].indexOf(Number(s.servingPlayer)) >= 0 ? Number(s.servingPlayer) : 0;
+    s.activeServer = [0, 1, 2, 3].indexOf(Number(s.activeServer)) >= 0 ? Number(s.activeServer) : (s.mode === 'singles' ? s.servingPlayer : 0);
+    s.activeReceiver = [0, 1, 2, 3].indexOf(Number(s.activeReceiver)) >= 0 ? Number(s.activeReceiver) : (s.mode === 'singles' ? (s.servingPlayer === 0 ? 2 : 0) : 2);
+    s.positions = Array.isArray(s.positions) && s.positions.length >= 4 ? s.positions.slice(0, 4) : defaults.positions.slice();
+    s.currentGame = Number.isFinite(Number(s.currentGame)) ? Math.min(Math.max(Number(s.currentGame), 1), 3) : 1;
+    s.matchOver = !!s.matchOver;
+    s.gamePaused = !!s.gamePaused;
+    s.isSwapped = !!s.isSwapped;
+    s.gameResults = Array.isArray(s.gameResults) ? s.gameResults.slice(0, 3) : defaults.gameResults.slice();
+    while (s.gameResults.length < 3) s.gameResults.push(null);
+    s.gameScores = Array.isArray(s.gameScores) ? s.gameScores.map(normalizeScoreEntry).filter(Boolean).slice(0, 3) : [];
+    s.pointLogs = Array.isArray(s.pointLogs) ? s.pointLogs.slice(0, 3).map(normalizePointLog) : defaults.pointLogs;
+    while (s.pointLogs.length < 3) s.pointLogs.push([{ p0: 0, p1: 0 }]);
+    s.winScore = Number.isFinite(Number(s.winScore)) ? Number(s.winScore) : 21;
+    return s;
+  }
+
+  function stateHasMatchData(s) {
+    return !!(s && (
+      s.gameScores.length > 0 ||
+      s.players[0].games > 0 || s.players[2].games > 0 ||
+      s.players[0].points > 0 || s.players[2].points > 0
+    ));
+  }
+
+  function normalizeArchiveEntry(entry) {
+    if (!entry || typeof entry !== 'object' || !entry.state) return null;
+    var cleanState = normalizeScoreboardState(entry.state);
+    if (!stateHasMatchData(cleanState)) return null;
+    var time = new Date(entry.timestamp);
+    return {
+      state: cleanState,
+      timestamp: isNaN(time.getTime()) ? new Date().toISOString() : time.toISOString()
+    };
+  }
+
+  let state = createState();
+  let history = [];
+  let matchArchive = [];
+  var chartInstance = null;
+  var currentDetailGameIdx = -1;
+  var currentViewMatchIdx = -1; // -1 = current match; >=0 = index into matchArchive
+
+  // ── Persistence ────────────────────────────────
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        state: state,
+        history: history,
+        matchArchive: matchArchive
+      }));
+    } catch(e) {
+      alert("存储空间已满，请清理部分历史赛事记录以继续保存！");
+      if (matchArchive.length > 5) {
+        matchArchive = matchArchive.slice(-5);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: state, history: history, matchArchive: matchArchive })); } catch(e2) {}
+      }
+    }
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      // Also try old v3 key for migration
+      if (!raw) raw = localStorage.getItem('badminton_scoreboard_v3');
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (!data.state) return false;
+
+      state = normalizeScoreboardState(data.state);
+      history = Array.isArray(data.history) ? data.history.map(normalizeScoreboardState) : [];
+      matchArchive = Array.isArray(data.matchArchive) ? data.matchArchive.map(normalizeArchiveEntry).filter(Boolean) : [];
+
+      // Migrate missing fields from older versions
+      if (state.mode === undefined) state.mode = 'singles';
+      if (state.doublesType === undefined) state.doublesType = null;
+      if (!Array.isArray(state.gameScores)) state.gameScores = [];
+      if (state.gamePaused === undefined) state.gamePaused = false;
+      if (!state.pointLogs || !Array.isArray(state.pointLogs)) {
+        state.pointLogs = [[{p0:0,p1:0}],[{p0:0,p1:0}],[{p0:0,p1:0}]];
+      }
+      if (state.isSwapped === undefined) state.isSwapped = false;
+      if (state.winScore === undefined) state.winScore = 21;
+      // Migrate players from 2-player to 4-player format
+      if (!Array.isArray(state.players) || state.players.length < 4) {
+        var oldPlayers = state.players || [{name:'球员 A',points:0,games:0},{name:'球员 B',points:0,games:0}];
+        state.players = [
+          oldPlayers[0] || { name: '球员 A', points: 0, games: 0 },
+          { name: '球员 A2', points: 0, games: 0 },
+          oldPlayers[1] || { name: '球员 B', points: 0, games: 0 },
+          { name: '球员 B2', points: 0, games: 0 }
+        ];
+        // Adjust servingPlayer: old 0→0, old 1→2
+        if (state.servingPlayer === 1) state.servingPlayer = 2;
+      }
+      if (!Array.isArray(state.positions) || state.positions.length < 4) {
+        state.positions = ['right','left','right','left'];
+      }
+      if (state.activeServer === undefined || state.activeServer === null) {
+        state.activeServer = (state.mode === 'singles') ? state.servingPlayer : 0;
+      }
+      if (state.activeReceiver === undefined || state.activeReceiver === null) {
+        state.activeReceiver = (state.mode === 'singles') ? (state.servingPlayer === 0 ? 2 : 0) : 2;
+      }
+      for (let i = 0; i < 3; i++) {
+        if (!state.pointLogs[i] || state.pointLogs[i].length === 0) {
+          state.pointLogs[i] = [{p0: 0, p1: 0}];
+        }
+      }
+
+      // Detect: game won but not advanced
+      if (!state.matchOver && !state.gamePaused) {
+        const idx = state.currentGame - 1;
+        if (idx >= 0 && state.gameResults[idx] != null &&
+            (state.players[0].points !== 0 || state.players[2].points !== 0)) {
+          state.gamePaused = true;
+        }
+      }
+
+      saveState();
+      return true;
+    } catch(e) { return false; }
+  }
+
+  // ── Recovery detection ─────────────────────────
+  function hasExistingData() {
+    const s = state;
+    if (getTeamAPoints() !== 0 || getTeamBPoints() !== 0) return true;
+    if (getTeamAGames() > 0 || getTeamBGames() > 0) return true;
+    if (s.gameScores.length > 0) return true;
+    if (s.gameResults.some(function(r) { return r !== null; })) return true;
+    if (s.matchOver) return true;
+    if (s.gamePaused) return true;
+    if (s.currentGame > 1) return true;
+    return false;
+  }
+
+  function getTeamAName() {
+    if (state.mode === 'doubles') {
+      return state.players[0].name + '/' + state.players[1].name;
+    }
+    return state.players[0].name;
+  }
+
+  function getTeamBName() {
+    if (state.mode === 'doubles') {
+      return state.players[2].name + '/' + state.players[3].name;
+    }
+    return state.players[2].name;
+  }
+
+  function getTeamAPoints() {
+    return state.players[0].points;
+  }
+
+  function getTeamBPoints() {
+    return state.players[2].points;
+  }
+
+  function getTeamAGames() {
+    return state.players[0].games;
+  }
+
+  function getTeamBGames() {
+    return state.players[2].games;
+  }
+
+  function getPlayerName(idx) {
+    return state.players[idx].name;
+  }
+
+  function buildRecoverySummary() {
+    var s = state;
+    var lines = [];
+    lines.push('<div class="rs-label">已恢复的比赛数据</div>');
+    var modeLabel = (s.mode === 'doubles') ? ' [双打]' : ' [单打]';
+    lines.push(escapeHTML(getTeamAName()) + ' vs ' + escapeHTML(getTeamBName()) + modeLabel);
+    if (s.matchOver) {
+      lines.push('比赛已结束 · 总局分 ' + getTeamAGames() + ' : ' + getTeamBGames());
+    } else if (s.gamePaused) {
+      var gs = s.gameScores[s.gameScores.length - 1] || { p0: getTeamAPoints(), p1: getTeamBPoints() };
+      lines.push('第 ' + s.currentGame + ' 局已结束（' + gs.p0 + ' : ' + gs.p1 + '）');
+      if (getTeamAGames() > 0 || getTeamBGames() > 0) {
+        lines.push('大局 ' + getTeamAGames() + ' : ' + getTeamBGames());
+      }
+    } else {
+      lines.push('当前第 ' + s.currentGame + ' 局，比分 ' + getTeamAPoints() + ' : ' + getTeamBPoints());
+      if (getTeamAGames() > 0 || getTeamBGames() > 0) {
+        lines.push('大局 ' + getTeamAGames() + ' : ' + getTeamBGames());
+      }
+    }
+    return lines.join('<br>');
+  }
+
+  function showRecoveryPrompt() {
+    recoverySummary.innerHTML = buildRecoverySummary();
+    recoveryOverlay.classList.add('active');
+  }
+
+  function hideRecoveryPrompt() {
+    recoveryOverlay.classList.remove('active');
+  }
+
+  function resumeMatch() {
+    hideRecoveryPrompt();
+    // Show appropriate overlay for the recovered state
+    if (state.matchOver) {
+      var winner = getTeamAGames() >= 2 ? 0 : 2;
+      showVictory(winner);
+    } else if (state.gamePaused) {
+      var winner = state.gameResults[state.currentGame - 1];
+      showGameWin(winner);
+    }
+    requestWakeLock();
+  }
+
+  function clearAndStartNew() {
+    archiveCurrentMatch();
+    state = createState();
+    history = [];
+    hideGameWin();
+    hideVictory();
+    hideRecoveryPrompt();
+    saveState();
+    render();
+    showModeSelection(function(mode) {
+      showScoringSelection(function(winScore) {
+        state.winScore = winScore;
+        saveState();
+        render();
+        requestWakeLock();
+      });
+    });
+  }
+
+  // ── History (undo) ─────────────────────────────
+  function pushHistory() {
+    history.push(JSON.parse(JSON.stringify(state)));
+    if (history.length > 100) history.shift();
+  }
+
+  function undo() {
+    if (history.length === 0) return;
+
+    if (state.matchOver) hideVictory();
+    if (state.gamePaused) hideGameWin();
+
+    state = history.pop();
+
+    if (state.matchOver) {
+      saveState();
+      render();
+      var winner = getTeamAGames() >= 2 ? 0 : 2;
+      showVictory(winner);
+      return;
+    }
+    if (state.gamePaused) {
+      saveState();
+      render();
+      var winner = state.gameResults[state.currentGame - 1];
+      showGameWin(winner);
+      return;
+    }
+
+    saveState();
+    render();
+  }
+
+  // ── Game Logic ─────────────────────────────────
+  function isOnRight(idx) {
+    return state.positions[idx] === 'right';
+  }
+
+  function isOnLeft(idx) {
+    return state.positions[idx] === 'left';
+  }
+
+  function getTeamIdx(idx) {
+    return idx < 2 ? 0 : 2; // 0=Team A, 2=Team B
+  }
+
+  function getTeammate(idx) {
+    if (idx < 2) return idx === 0 ? 1 : 0;
+    return idx === 2 ? 3 : 2;
+  }
+
+  function getServeCourt(playerIdx) {
+    if (state.mode === 'doubles') {
+      return isOnRight(playerIdx) ? '右区发球' : '左区发球';
+    }
+    var pts = state.players[playerIdx].points;
+    return (pts % 2 === 0) ? '右区发球' : '左区发球';
+  }
+
+  function checkGameWinner() {
+    var ws = state.winScore || 21;
+    var cap = ws === 15 ? 21 : 30;
+    var p0 = getTeamAPoints();
+    var p2 = getTeamBPoints();
+    if (p0 >= cap) return 0;
+    if (p2 >= cap) return 2;
+    if (p0 >= ws && p0 - p2 >= 2) return 0;
+    if (p2 >= ws && p2 - p0 >= 2) return 2;
+    return -1;
+  }
+
+  function getActiveServerForSingles(teamIdx) {
+    // In singles, server is always the team's sole player
+    return teamIdx;
+  }
+
+  function initDoublesPositions(servingTeam) {
+    // servingTeam: 0 = Team A serves first, 1 = Team B serves first (default 0)
+    state.positions = ['right', 'left', 'right', 'left'];
+    if (servingTeam === 1) {
+      // Team B serves: player 2 from right
+      state.activeServer = 2;
+      state.activeReceiver = 0;
+    } else {
+      // Team A serves: player 0 from right
+      state.activeServer = 0;
+      state.activeReceiver = 2;
+    }
+  }
+
+  function addPoint(teamIdx) {
+    // teamIdx: 0 for Team A, 1 for Team B (0 for side0, 1 for side2)
+    if (!state.winScore) return;
+    if (state.matchOver) return;
+    if (state.gamePaused) return;
+
+    pushHistory();
+
+    if (state.mode === 'doubles') {
+      addPointDoubles(teamIdx);
+    } else {
+      addPointSingles(teamIdx);
+    }
+
+    state.pointLogs[state.currentGame - 1].push({
+      p0: getTeamAPoints(),
+      p1: getTeamBPoints()
+    });
+
+    var winner = checkGameWinner();
+    if (winner !== -1) {
+      state.gameResults[state.currentGame - 1] = winner;
+      state.gameScores.push({
+        p0: getTeamAPoints(),
+        p1: getTeamBPoints()
+      });
+      state.players[winner].games++;
+      if (state.mode === 'doubles') {
+        state.players[winner + 1].games++; // sync teammate games
+      }
+
+      if (state.players[winner].games >= 2) {
+        state.matchOver = true;
+        saveState();
+        render();
+        showVictory(winner);
+        return;
+      }
+
+      state.gamePaused = true;
+      saveState();
+      render();
+      showGameWin(winner);
+      return;
+    }
+
+    saveState();
+    render();
+  }
+
+  function addPointSingles(teamIdx) {
+    var pIdx = teamIdx === 0 ? 0 : 2;
+    state.players[pIdx].points++;
+    state.servingPlayer = pIdx;
+    if (state.mode === 'singles') {
+      state.activeServer = pIdx;
+      state.activeReceiver = (pIdx === 0 ? 2 : 0);
+    }
+  }
+
+  function addPointDoubles(teamIdx) {
+    // teamIdx: 0 = Team A, 1 = Team B
+    var scoringTeam = teamIdx; // 0=A, 1=B
+    var servingTeam = state.activeServer < 2 ? 0 : 1;
+
+    // Increment the scoring team's points
+    var scorePlayerIdx = scoringTeam === 0 ? 0 : 2;
+    state.players[scorePlayerIdx].points++;
+    state.players[scorePlayerIdx + 1].points++; // sync teammate (only called in doubles)
+
+    if (scoringTeam === servingTeam) {
+      // 连得分：得分方 = 发球方
+      // 1. 得分方的两名队员互换左右站位
+      var srvA = scoringTeam === 0 ? 0 : 2;
+      var srvB = srvA + 1;
+      var tmp = state.positions[srvA];
+      state.positions[srvA] = state.positions[srvB];
+      state.positions[srvB] = tmp;
+
+      // 2. 发球员不变（同一人继续发）
+      // 3. 接发球方站位不变，但接发球员变为对方另一人
+      var recvTeamA = servingTeam === 0 ? 2 : 0;
+      var recvTeamB = recvTeamA + 1;
+      state.activeReceiver = (state.activeReceiver === recvTeamA) ? recvTeamB : recvTeamA;
+    } else {
+      // 夺回发球权：得分方 = 接发球方
+      // 1. 双方4名队员的物理站位绝对不变
+      // 2. 新的发球员由得分方的当前分数决定
+      var newScore = getTeamAPoints();
+      if (scoringTeam === 1) newScore = getTeamBPoints();
+
+      var newSrvTeamA = scoringTeam === 0 ? 0 : 2;
+      var newSrvTeamB = newSrvTeamA + 1;
+
+      if (newScore % 2 === 0) {
+        // 偶数分 → 站在右侧的队员发球
+        state.activeServer = isOnRight(newSrvTeamA) ? newSrvTeamA : newSrvTeamB;
+      } else {
+        // 奇数分 → 站在左侧的队员发球
+        state.activeServer = isOnLeft(newSrvTeamA) ? newSrvTeamA : newSrvTeamB;
+      }
+
+      // 3. 接发球员变为对角线上的对手
+      var serverOnRight = isOnRight(state.activeServer);
+      var oppTeamA = scoringTeam === 0 ? 2 : 0;
+      var oppTeamB = oppTeamA + 1;
+      state.activeReceiver = isOnRight(oppTeamA) === serverOnRight ? oppTeamA : oppTeamB;
+    }
+  }
+
+  function advanceToNextGame() {
+    pushHistory();
+    var winner = state.gameResults[state.currentGame - 1];
+    state.currentGame++;
+    state.players[0].points = 0;
+    state.players[1].points = 0;
+    state.players[2].points = 0;
+    state.players[3].points = 0;
+    if (state.mode === 'doubles') {
+      initDoublesPositions(winner === 0 ? 0 : 1);
+    } else {
+      state.servingPlayer = winner;
+      state.activeServer = winner;
+      state.activeReceiver = (winner === 0 ? 2 : 0);
+    }
+    state.gamePaused = false;
+    state.isSwapped = false;
+    if (state.pointLogs[state.currentGame - 1].length === 0) {
+      state.pointLogs[state.currentGame - 1] = [{p0: 0, p1: 0}];
+    }
+    saveState();
+    hideGameWin();
+    render();
+  }
+
+  function switchSides() {
+    if (!state.winScore) return;
+    if (state.matchOver) return;
+    if (state.gamePaused) return;
+    pushHistory();
+
+    state.isSwapped = !state.isSwapped;
+
+    saveState();
+    render();
+  }
+
+  function resetGame() {
+    if (!state.winScore) return;
+    if (state.matchOver) return;
+    if (state.gamePaused) return;
+    pushHistory();
+
+    state.players[0].points = 0;
+    state.players[1].points = 0;
+    state.players[2].points = 0;
+    state.players[3].points = 0;
+    if (state.mode === 'doubles') {
+      var servingTeam = 0;
+      if (state.currentGame >= 2) {
+        var prevWinner = state.gameResults[state.currentGame - 2];
+        servingTeam = (prevWinner === 0 || prevWinner === 1) ? 0 : 1;
+      }
+      initDoublesPositions(servingTeam);
+    } else {
+      if (state.currentGame >= 2) {
+        state.servingPlayer = state.gameResults[state.currentGame - 2];
+      } else {
+        state.servingPlayer = 0;
+      }
+      state.activeServer = state.servingPlayer;
+      state.activeReceiver = (state.servingPlayer === 0 ? 2 : 0);
+    }
+    state.isSwapped = false;
+    state.pointLogs[state.currentGame - 1] = [{p0: 0, p1: 0}];
+
+    saveState();
+    render();
+  }
+
+  function archiveCurrentMatch() {
+    if (getTeamAPoints() > 0 || getTeamBPoints() > 0 ||
+        getTeamAGames() > 0 || getTeamBGames() > 0 ||
+        state.gameScores.length > 0) {
+      var archived = JSON.parse(JSON.stringify(state));
+      matchArchive.push({
+        state: archived,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  function getActiveState() {
+    if (currentViewMatchIdx >= 0 && currentViewMatchIdx < matchArchive.length) {
+      var entry = normalizeArchiveEntry(matchArchive[currentViewMatchIdx]);
+      if (entry) {
+        matchArchive[currentViewMatchIdx] = entry;
+        return entry.state;
+      }
+      currentViewMatchIdx = -1;
+    }
+    return state;
+  }
+
+  function resetMatch() {
+    archiveCurrentMatch();
+    pushHistory();
+    state = createState();
+    history = [];
+    hideGameWin();
+    hideVictory();
+    saveState();
+    render();
+    showModeSelection(function(mode) {
+      showScoringSelection(function(winScore) {
+        state.winScore = winScore;
+        saveState();
+        render();
+        requestWakeLock();
+      });
+    });
+  }
+
+  function editPlayerName(idx) {
+    if (!state.winScore) return;
+    if (state.matchOver) return;
+    if (state.gamePaused) return;
+    var current = state.players[idx].name;
+    var newName = prompt('输入球员名称：', current);
+    if (newName !== null && newName.trim() !== '') {
+      pushHistory();
+      state.players[idx].name = newName.trim();
+      saveState();
+      render();
+    }
+  }
+
+  // ── Confirmation Modal ─────────────────────────
+  var modalCallback = null;
+
+  function showModal(icon, title, text, confirmLabel, confirmClass, cb) {
+    modalIcon.textContent = icon;
+    modalTitle.textContent = title;
+    modalText.textContent = text;
+    modalConfirm.textContent = confirmLabel;
+    modalConfirm.className = 'modal-btn ' + (confirmClass || 'confirm');
+    modalCallback = cb;
+    modalOverlay.classList.add('active');
+  }
+
+  function hideModal() {
+    modalOverlay.classList.remove('active');
+    modalCallback = null;
+  }
+
+  // ── Mode Selection ────────────────────────────
+  var modeSelectionCallback = null;
+
+  function showModeSelection(cb) {
+    modeSelectionCallback = cb;
+    modeOverlay.classList.add('active');
+  }
+
+  function hideModeSelection() {
+    modeOverlay.classList.remove('active');
+    modeSelectionCallback = null;
+  }
+
+  // ── Doubles Type Selection ──────────────────────
+  var doublesTypeSelectionCallback = null;
+
+  function showDoublesTypeSelection(cb) {
+    doublesTypeSelectionCallback = cb;
+    doublesTypeOverlay.classList.add('active');
+  }
+
+  function hideDoublesTypeSelection() {
+    doublesTypeOverlay.classList.remove('active');
+    doublesTypeSelectionCallback = null;
+  }
+
+  // ── Serve Setup (Doubles First Serve & Receive) ───
+  var serveSetupScoringCallback = null;
+  var serveSetupSelectedServer = null;
+  var serveSetupSelectedReceiver = null;
+
+  function getSetupTeam(playerIdx) {
+    return playerIdx < 2 ? 0 : 1;
+  }
+
+  function isServeSetupReady() {
+    return serveSetupSelectedServer !== null &&
+      serveSetupSelectedReceiver !== null &&
+      getSetupTeam(serveSetupSelectedServer) !== getSetupTeam(serveSetupSelectedReceiver);
+  }
+
+  function showServeSetup(scoringCallback) {
+    serveSetupScoringCallback = scoringCallback;
+    serveSetupSelectedServer = null;
+    serveSetupSelectedReceiver = null;
+    renderServeSetupPlayerOptions();
+    serveSetupOverlay.classList.add('active');
+  }
+
+  function hideServeSetup() {
+    serveSetupOverlay.classList.remove('active');
+    serveSetupScoringCallback = null;
+    serveSetupSelectedServer = null;
+    serveSetupSelectedReceiver = null;
+  }
+
+  function renderServeSetupPlayerOptions() {
+    // Render server options (all 4 players)
+    var serverHTML = '';
+    for (var i = 0; i < 4; i++) {
+      var teamLabel = i < 2 ? 'A队' : 'B队';
+      var selClass = (serveSetupSelectedServer === i) ? ' server-selected' : '';
+      var isDisabledServer = serveSetupSelectedReceiver !== null &&
+        getSetupTeam(serveSetupSelectedReceiver) === getSetupTeam(i);
+      var disabledServerClass = isDisabledServer ? ' disabled' : '';
+      serverHTML += '<div class="serve-player-tile' + selClass + disabledServerClass + '" data-player-idx="' + i + '" data-role="server" aria-disabled="' + isDisabledServer + '">'
+        + escapeHTML(state.players[i].name) + '<span class="tile-team-tag">' + teamLabel + '</span></div>';
+    }
+    serverOptions.innerHTML = serverHTML;
+
+    // Render receiver options (all 4 players)
+    var receiverHTML = '';
+    for (var j = 0; j < 4; j++) {
+      var teamLabel2 = j < 2 ? 'A队' : 'B队';
+      var selClass2 = (serveSetupSelectedReceiver === j) ? ' receiver-selected' : '';
+      var isDisabledReceiver = serveSetupSelectedServer !== null &&
+        getSetupTeam(serveSetupSelectedServer) === getSetupTeam(j);
+      var disabledReceiverClass = isDisabledReceiver ? ' disabled' : '';
+      receiverHTML += '<div class="serve-player-tile' + selClass2 + disabledReceiverClass + '" data-player-idx="' + j + '" data-role="receiver" aria-disabled="' + isDisabledReceiver + '">'
+        + escapeHTML(state.players[j].name) + '<span class="tile-team-tag">' + teamLabel2 + '</span></div>';
+    }
+    receiverOptions.innerHTML = receiverHTML;
+    startDoublesMatchBtn.disabled = !isServeSetupReady();
+
+    // Bind click handlers
+    var allTiles = serveSetupOverlay.querySelectorAll('.serve-player-tile');
+    for (var k = 0; k < allTiles.length; k++) {
+      allTiles[k].addEventListener('click', function(e) {
+        if (this.classList.contains('disabled')) return;
+        var idx = parseInt(this.getAttribute('data-player-idx'));
+        var role = this.getAttribute('data-role');
+        if (role === 'server') {
+          serveSetupSelectedServer = idx;
+          if (serveSetupSelectedReceiver !== null &&
+              getSetupTeam(serveSetupSelectedReceiver) === getSetupTeam(idx)) {
+            serveSetupSelectedReceiver = null;
+          }
+        } else {
+          serveSetupSelectedReceiver = idx;
+          if (serveSetupSelectedServer !== null &&
+              getSetupTeam(serveSetupSelectedServer) === getSetupTeam(idx)) {
+            serveSetupSelectedServer = null;
+          }
+        }
+        renderServeSetupPlayerOptions();
+      });
+    }
+  }
+
+  function selectDoublesType(doublesType) {
+    state.doublesType = doublesType;
+    // Set player names based on doubles type
+    if (doublesType === 'men') {
+      state.players[0].name = 'A1男';
+      state.players[1].name = 'A2男';
+      state.players[2].name = 'B1男';
+      state.players[3].name = 'B2男';
+    } else if (doublesType === 'women') {
+      state.players[0].name = 'A1女';
+      state.players[1].name = 'A2女';
+      state.players[2].name = 'B1女';
+      state.players[3].name = 'B2女';
+    } else if (doublesType === 'mixed') {
+      state.players[0].name = 'A男';
+      state.players[1].name = 'A女';
+      state.players[2].name = 'B男';
+      state.players[3].name = 'B女';
+    }
+    if (doublesTypeSelectionCallback) {
+      var cb = doublesTypeSelectionCallback;
+      hideDoublesTypeSelection();
+      cb(doublesType);
+    }
+  }
+
+  function selectMode(mode) {
+    state.mode = mode;
+    if (mode === 'doubles') {
+      initDoublesPositions();
+      state.servingPlayer = 0;
+    } else {
+      state.activeServer = 0;
+      state.activeReceiver = 2;
+      state.servingPlayer = 0;
+    }
+    if (modeSelectionCallback) {
+      var cb = modeSelectionCallback;
+      hideModeSelection();
+      cb(mode);
+    }
+  }
+
+  // ── Scoring System Selection ────────────────────
+  var scoringSelectionCallback = null;
+
+  function showScoringSelection(cb) {
+    scoringSelectionCallback = cb;
+    scoringOverlay.classList.add('active');
+  }
+
+  function hideScoringSelection() {
+    scoringOverlay.classList.remove('active');
+    scoringSelectionCallback = null;
+  }
+
+  function selectScoring(winScore) {
+    if (!scoringSelectionCallback) return;
+    state.winScore = winScore;
+    var cb = scoringSelectionCallback;
+    hideScoringSelection();
+    if (state.mode === 'doubles') {
+      showServeSetup(cb);
+    } else {
+      cb(winScore);
+    }
+  }
+
+  // ── Game Win Modal ─────────────────────────────
+  function showGameWin(winnerIdx) {
+    var winnerName = winnerIdx === 0 ? getTeamAName() : getTeamBName();
+    var gameNum = state.currentGame;
+    var gs = state.gameScores[state.gameScores.length - 1] || { p0: getTeamAPoints(), p1: getTeamBPoints() };
+
+    gamewinEmoji.textContent = '🏅';
+    gamewinTitle.textContent = winnerName + ' 赢得了第 ' + gameNum + ' 局！';
+    gamewinScore.textContent = gs.p0 + ' : ' + gs.p1;
+    gamewinBtn.textContent = '进入下一局';
+    gamewinOverlay.classList.add('active');
+  }
+
+  function hideGameWin() {
+    gamewinOverlay.classList.remove('active');
+  }
+
+  // ── Victory Overlay ────────────────────────────
+  function showVictory(winnerIdx) {
+    var winnerName = winnerIdx === 0 ? getTeamAName() : getTeamBName();
+    victoryText.textContent = winnerName + ' 赢得比赛！';
+
+    var gameDetails = state.gameScores
+      .map(function(s, i) { return '第' + (i + 1) + '局 ' + s.p0 + ':' + s.p1; })
+      .join(' ｜ ');
+
+    victoryScore.textContent =
+      '总局分 ' + getTeamAGames() + ' : ' + getTeamBGames() +
+      (gameDetails ? '\n' + gameDetails : '');
+
+    victoryOverlay.classList.add('active');
+  }
+
+  function hideVictory() {
+    victoryOverlay.classList.remove('active');
+  }
+
+  // ── History Panel ──────────────────────────────
+  function openHistory() {
+    currentViewMatchIdx = -1;
+    hideChart();
+    historyOverlay.classList.add('active');
+    historyMatchListView.style.display = 'block';
+    historyMainView.style.display = 'none';
+    historyDetailView.style.display = 'none';
+    renderMatchList();
+  }
+
+  function closeHistory() {
+    hideChart();
+    historyOverlay.classList.remove('active');
+    currentViewMatchIdx = -1;
+  }
+
+  // ── Level 1: Match Archive List ────────────────
+  function getArchivedTeamAName(s) {
+    s = normalizeScoreboardState(s);
+    if (s.mode === 'doubles') return s.players[0].name + '/' + s.players[1].name;
+    return s.players[0].name;
+  }
+
+  function getArchivedTeamBName(s) {
+    s = normalizeScoreboardState(s);
+    if (s.mode === 'doubles') return s.players[2].name + '/' + s.players[3].name;
+    return s.players[2].name;
+  }
+
+  function getArchivedTeamAGames(s) { return normalizeScoreboardState(s).players[0].games; }
+  function getArchivedTeamBGames(s) { return normalizeScoreboardState(s).players[2].games; }
+
+  function renderMatchList() {
+    historyMatchListView.style.display = 'block';
+    historyMainView.style.display = 'none';
+    historyDetailView.style.display = 'none';
+
+    matchArchive = matchArchive.map(normalizeArchiveEntry).filter(Boolean);
+
+    var cards = historyMatchBody.querySelectorAll('.history-match-card, .match-current-btn');
+    cards.forEach(function(c) { c.remove(); });
+
+    var sorted = matchArchive.slice().sort(function(a, b) {
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    });
+
+    if (sorted.length === 0 && state.gameScores.length === 0) {
+      historyMatchEmpty.style.display = 'block';
+      return;
+    }
+
+    historyMatchEmpty.style.display = 'none';
+
+    // "View current match" button if current match has data
+    if (state.gameScores.length > 0 || getTeamAGames() > 0 || getTeamBGames() > 0 ||
+        getTeamAPoints() > 0 || getTeamBPoints() > 0) {
+      var currBtn = document.createElement('button');
+      currBtn.className = 'match-current-btn';
+      currBtn.textContent = '📌 查看当前进行中比赛';
+      currBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        currentViewMatchIdx = -1;
+        viewMatchGames();
+      });
+      historyMatchBody.appendChild(currBtn);
+    }
+
+    for (var m = 0; m < sorted.length; m++) {
+      var entry = sorted[m];
+      var ts = new Date(entry.timestamp);
+      var dateStr = ts.getFullYear() + '-' +
+        String(ts.getMonth() + 1).padStart(2, '0') + '-' +
+        String(ts.getDate()).padStart(2, '0') + ' ' +
+        String(ts.getHours()).padStart(2, '0') + ':' +
+        String(ts.getMinutes()).padStart(2, '0');
+
+      var s = entry.state;
+      var p0Name = getArchivedTeamAName(s);
+      var p1Name = getArchivedTeamBName(s);
+      var totalScore = getArchivedTeamAGames(s) + ' : ' + getArchivedTeamBGames(s);
+
+      var realIdx = matchArchive.indexOf(entry);
+
+      var card = document.createElement('div');
+      card.className = 'history-match-card';
+      card.innerHTML =
+        '<div class="history-match-top">' +
+          '<div class="history-match-info">' +
+            '<div class="history-match-date">' + dateStr + '</div>' +
+            '<div class="history-match-vs">' +
+              '<span class="m-p1">' + escapeHTML(p0Name) + '</span>' +
+              '  vs  ' +
+              '<span class="m-p2">' + escapeHTML(p1Name) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="history-match-total">' + totalScore + '</div>' +
+        '</div>' +
+        '<div class="history-match-actions">' +
+          '<button class="match-action-btn view" data-idx="' + realIdx + '">查看详情</button>' +
+          '<button class="match-action-btn export" data-idx="' + realIdx + '">导出战报图片</button>' +
+          '<button class="match-action-btn delete" data-idx="' + realIdx + '">删除</button>' +
+        '</div>';
+
+      historyMatchBody.appendChild(card);
+    }
+
+    // Bind buttons
+    historyMatchBody.querySelectorAll('.match-action-btn.view').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        currentViewMatchIdx = parseInt(this.getAttribute('data-idx'));
+        if (!Number.isInteger(currentViewMatchIdx) || currentViewMatchIdx < 0 || currentViewMatchIdx >= matchArchive.length) {
+          currentViewMatchIdx = -1;
+          renderMatchList();
+          return;
+        }
+        viewMatchGames();
+      });
+    });
+
+    historyMatchBody.querySelectorAll('.match-action-btn.export').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = parseInt(this.getAttribute('data-idx'));
+        if (!Number.isInteger(idx) || idx < 0 || idx >= matchArchive.length) {
+          renderMatchList();
+          return;
+        }
+        exportMatchImage(idx);
+      });
+    });
+
+    historyMatchBody.querySelectorAll('.match-action-btn.delete').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var idx = parseInt(this.getAttribute('data-idx'));
+        if (!Number.isInteger(idx) || idx < 0 || idx >= matchArchive.length) {
+          renderMatchList();
+          return;
+        }
+        var s = matchArchive[idx].state;
+        var label = getArchivedTeamAName(s) + ' vs ' + getArchivedTeamBName(s);
+        showModal('⚠️', '删除比赛记录', '确定要删除这场比赛记录吗？ ' + label, '确认删除', 'confirm', function() {
+          matchArchive.splice(idx, 1);
+          saveState();
+          renderMatchList();
+        });
+      });
+    });
+  }
+
+  function escapeHTML(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str == null ? '' : String(str)));
+    return div.innerHTML;
+  }
+
+  // ── Level 2: Game List for a Match ─────────────
+  function viewMatchGames() {
+    hideChart();
+    historyMatchListView.style.display = 'none';
+    historyMainView.style.display = 'block';
+    historyDetailView.style.display = 'none';
+
+    var s = getActiveState();
+    historyMainTitle.textContent = getArchivedTeamAName(s) + ' vs ' + getArchivedTeamBName(s);
+    renderHistoryListForState(s);
+  }
+
+  function renderHistoryListForState(s) {
+    var completed = s.gameScores.length;
+    if (completed === 0) {
+      historyEmpty.style.display = 'block';
+      var cards = historyBody.querySelectorAll('.history-game-card');
+      cards.forEach(function(c) { c.remove(); });
+      return;
+    }
+
+    historyEmpty.style.display = 'none';
+
+    var cards = historyBody.querySelectorAll('.history-game-card');
+    cards.forEach(function(c) { c.remove(); });
+
+    for (var i = 0; i < completed; i++) {
+      var gs = s.gameScores[i];
+      var winnerIdx = s.gameResults[i];
+      var isTeamA = (winnerIdx === 0 || winnerIdx === 1);
+      var winnerName = isTeamA ? getArchivedTeamAName(s) : getArchivedTeamBName(s);
+      var winnerClass = isTeamA ? 'p1-name' : 'p2-name';
+
+      var card = document.createElement('div');
+      card.className = 'history-game-card';
+      card.innerHTML =
+        '<div class="history-game-info">' +
+          '<div class="history-game-label">第 ' + (i + 1) + ' 局</div>' +
+          '<div class="history-game-result">' + gs.p0 + ' : ' + gs.p1 + '</div>' +
+          '<div class="history-game-winner">' +
+            '<span class="' + winnerClass + '">' + escapeHTML(winnerName) + '</span> 胜' +
+          '</div>' +
+        '</div>' +
+        '<button class="history-detail-btn" data-game="' + i + '">查看流水</button>';
+
+      historyBody.appendChild(card);
+    }
+
+    historyBody.querySelectorAll('.history-detail-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var gameIdx = parseInt(this.getAttribute('data-game'));
+        showGameDetail(gameIdx);
+      });
+    });
+  }
+
+  function backToMatchList() {
+    hideChart();
+    currentViewMatchIdx = -1;
+    historyMatchListView.style.display = 'block';
+    historyMainView.style.display = 'none';
+    historyDetailView.style.display = 'none';
+  }
+
+  // ── Level 3: Point Flow Detail ─────────────────
+  function showGameDetail(gameIdx) {
+    currentDetailGameIdx = gameIdx;
+    hideChart();
+    var s = getActiveState();
+    var gs = s.gameScores[gameIdx];
+    var log = s.pointLogs[gameIdx];
+    var winnerIdx = s.gameResults[gameIdx];
+
+    detailTitle.textContent = '第 ' + (gameIdx + 1) + ' 局 得分流水';
+    detailGameLabel.textContent = '最终比分 ' + gs.p0 + ' : ' + gs.p1;
+
+    var p0Name = escapeHTML(getArchivedTeamAName(s));
+    var p1Name = escapeHTML(getArchivedTeamBName(s));
+    detailPlayers.innerHTML =
+      '<span class="p1-name">' + p0Name + '</span>' +
+      '  vs  ' +
+      '<span class="p2-name">' + p1Name + '</span>';
+
+    flowList.innerHTML = '';
+    if (!log || log.length <= 1) {
+      flowList.innerHTML = '<div class="flow-row flow-start"><span style="color:var(--muted)">无详细流水记录</span></div>';
+    } else {
+      for (var i = 0; i < log.length; i++) {
+        var entry = log[i];
+        var rowClass = 'flow-start';
+        var whoText = '';
+
+        if (i === 0) {
+          whoText = '开始';
+        } else {
+          var prev = log[i - 1];
+          if (entry.p0 > prev.p0) {
+            rowClass = 'flow-p0-scored';
+            whoText = p0Name + ' 得分';
+          } else if (entry.p1 > prev.p1) {
+            rowClass = 'flow-p1-scored';
+            whoText = p1Name + ' 得分';
+          }
+        }
+
+        var row = document.createElement('div');
+        row.className = 'flow-row ' + rowClass;
+        row.innerHTML =
+          '<span class="flow-score-p0">' + entry.p0 + '</span>' +
+          '<span class="flow-colon">:</span>' +
+          '<span class="flow-score-p1">' + entry.p1 + '</span>' +
+          '<span class="flow-who">' + whoText + '</span>';
+        flowList.appendChild(row);
+      }
+    }
+
+    flowFinal.textContent = '最终：' + gs.p0 + ' : ' + gs.p1;
+
+    historyMainView.style.display = 'none';
+    historyDetailView.style.display = 'flex';
+    flowScroll.scrollTop = 0;
+  }
+
+  function backToHistoryList() {
+    hideChart();
+    historyDetailView.style.display = 'none';
+    historyMainView.style.display = 'block';
+  }
+
+  // ── Chart ──────────────────────────────────────
+  function hideChart() {
+    chartContainer.classList.remove('active');
+    chartExportWrap.classList.remove('active');
+    chartToggleBtn.textContent = '查看趋势图表 📊';
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+  }
+
+  function renderChart(gameIdx) {
+    if (typeof Chart === 'undefined') {
+      showModal('⚠️', '图表暂不可用', '图表库未加载成功，请检查网络后再试。', '知道了', 'primary', null);
+      return false;
+    }
+
+    var s = getActiveState();
+    var log = s.pointLogs[gameIdx];
+    if (!log || log.length <= 1) {
+      showModal('📊', '暂无趋势数据', '这局没有完整的得分流水，无法生成趋势图。', '知道了', 'primary', null);
+      return false;
+    }
+
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+
+    var labels = [];
+    var p0Data = [];
+    var p1Data = [];
+
+    for (var i = 0; i < log.length; i++) {
+      labels.push(i);
+      p0Data.push(log[i].p0);
+      p1Data.push(log[i].p1);
+    }
+
+    var ctx = gameChart.getContext('2d');
+    var style = getComputedStyle(document.documentElement);
+    var p1Color = style.getPropertyValue('--p1').trim() || '#3b82f6';
+    var p2Color = style.getPropertyValue('--p2').trim() || '#ef4444';
+    var textColor = style.getPropertyValue('--text').trim() || '#f1f5f9';
+    var mutedColor = style.getPropertyValue('--muted').trim() || '#64748b';
+
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: getArchivedTeamAName(s),
+            data: p0Data,
+            borderColor: p1Color,
+            backgroundColor: p1Color + '30',
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: p1Color,
+            fill: false
+          },
+          {
+            label: getArchivedTeamBName(s),
+            data: p1Data,
+            borderColor: p2Color,
+            backgroundColor: p2Color + '30',
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointBackgroundColor: p2Color,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        onClick: function(event, elements, chart) {
+          if (elements.length > 0) {
+            var idx = elements[0].index;
+            var entry = log[idx];
+            alert(getArchivedTeamAName(s) + ' ' + entry.p0 + ' : ' + entry.p1 + ' ' + getArchivedTeamBName(s) + '\n轮次：' + idx);
+          }
+        },
+        plugins: {
+          legend: {
+            labels: {
+              color: textColor,
+              font: { size: 12 },
+              usePointStyle: true,
+              padding: 16
+            }
+          },
+          tooltip: {
+            callbacks: {
+              title: function(items) {
+                return '轮次 ' + items[0].label;
+              },
+              label: function(item) {
+                return item.dataset.label + ': ' + item.raw;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: '得分轮次',
+              color: mutedColor
+            },
+            ticks: {
+              color: mutedColor,
+              font: { size: 11 }
+            },
+            grid: {
+              color: 'rgba(255,255,255,0.06)'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: '分数',
+              color: mutedColor
+            },
+            ticks: {
+              color: mutedColor,
+              font: { size: 11 },
+              stepSize: 1
+            },
+            grid: {
+              color: 'rgba(255,255,255,0.06)'
+            },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    return true;
+  }
+
+  function toggleChart() {
+    if (chartContainer.classList.contains('active')) {
+      hideChart();
+    } else {
+      if (!renderChart(currentDetailGameIdx)) return;
+      chartContainer.classList.add('active');
+      chartExportWrap.classList.add('active');
+      chartToggleBtn.textContent = '隐藏趋势图表 📊';
+    }
+  }
+
+  function exportChart() {
+    if (!chartInstance) return;
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = gameChart.width;
+    tempCanvas.height = gameChart.height;
+    var tempCtx = tempCanvas.getContext('2d');
+    tempCtx.fillStyle = '#111118';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(gameChart, 0, 0);
+    var url = tempCanvas.toDataURL('image/png');
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = '第' + (currentDetailGameIdx + 1) + '局_趋势图.png';
+    a.click();
+  }
+
+  // ── Match Report Export (html2canvas) ──────────
+  function exportMatchImage(matchIdx) {
+    if (typeof html2canvas === 'undefined') {
+      showModal('⚠️', '导出暂不可用', '图片导出库未加载成功，请检查网络后再试。', '知道了', 'primary', null);
+      return;
+    }
+
+    var entry = matchArchive[matchIdx];
+    if (!entry) return;
+
+    var s = entry.state;
+    var ts = new Date(entry.timestamp);
+    var dateStr = ts.getFullYear() + '-' +
+      String(ts.getMonth() + 1).padStart(2, '0') + '-' +
+      String(ts.getDate()).padStart(2, '0') + ' ' +
+      String(ts.getHours()).padStart(2, '0') + ':' +
+      String(ts.getMinutes()).padStart(2, '0');
+
+    var p0Name = getArchivedTeamAName(s);
+    var p1Name = getArchivedTeamBName(s);
+    var totalScore = getArchivedTeamAGames(s) + ' : ' + getArchivedTeamBGames(s);
+
+    var gamesHTML = '';
+    for (var i = 0; i < s.gameScores.length; i++) {
+      var gs = s.gameScores[i];
+      gamesHTML +=
+        '<div class="export-card-game-row">' +
+          '<span class="export-card-game-label">第' + (i + 1) + '局</span>' +
+          '<span class="export-card-game-score">' + gs.p0 + ' : ' + gs.p1 + '</span>' +
+        '</div>';
+    }
+
+    var modeLine = (s.mode === 'doubles') ? '<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:4px;">双打</div>' : '';
+
+    exportCard.innerHTML =
+      '<div class="export-card-title">🏸 羽毛球战报</div>' +
+      '<div class="export-card-date">' + dateStr + '</div>' +
+      modeLine +
+      '<div class="export-card-vs">' +
+        '<span class="p1c">' + escapeHTML(p0Name) + '</span>' +
+        '  vs  ' +
+        '<span class="p2c">' + escapeHTML(p1Name) + '</span>' +
+      '</div>' +
+      '<div class="export-card-final">' + totalScore + '</div>' +
+      '<div class="export-card-games">' + gamesHTML + '</div>';
+
+    exportCardContainer.style.opacity = '1';
+
+    setTimeout(function() {
+    html2canvas(exportCard, {
+      backgroundColor: '#111118',
+      scale: 2
+    }).then(function(canvas) {
+      var url = canvas.toDataURL('image/png');
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = '羽毛球战报_' + dateStr.replace(/[: ]/g, '_') + '.png';
+      a.click();
+
+      exportCardContainer.style.opacity = '0';
+    }).catch(function(err) {
+      console.error('导出图片失败:', err);
+      exportCardContainer.style.opacity = '0';
+    });
+    }, 50);
+  }
+
+  // ── Render ─────────────────────────────────────
+  function render() {
+    var isDoubles = state.mode === 'doubles';
+    var sw = state.isSwapped;
+
+    // Map physical team indices to display side indices
+    // Team A (players 0,1) and Team B (players 2,3)
+    // side0 = left display, side1 = right display
+    var teamASide = sw ? 1 : 0; // 0 = left side, 1 = right side
+    var teamBSide = sw ? 0 : 1;
+
+    // Team A display on the correct side
+    var teamAPlayerA = 0; // players[0]
+    var teamAPlayerB = 1; // players[1]
+    // Team B display on the correct side
+    var teamBPlayerA = 2; // players[2]
+    var teamBPlayerB = 3; // players[3]
+
+    // Scores
+    var sA = getTeamAPoints();
+    var sB = getTeamBPoints();
+
+    // Side 0 score (left side) — depends on isSwapped
+    var side0Score = sw ? sB : sA;
+    var side1Score = sw ? sA : sB;
+
+    if (score0.textContent !== String(side0Score)) {
+      score0.textContent = side0Score;
+      score0.classList.remove('pop');
+      void score0.offsetWidth;
+      score0.classList.add('pop');
+    }
+    if (score1.textContent !== String(side1Score)) {
+      score1.textContent = side1Score;
+      score1.classList.remove('pop');
+      void score1.offsetWidth;
+      score1.classList.add('pop');
+    }
+
+    // Games
+    games0.textContent = sw ? getTeamBGames() : getTeamAGames();
+    games1.textContent = sw ? getTeamAGames() : getTeamBGames();
+
+    // Names display
+    if (isDoubles) {
+      // Show both name rows, use column layout
+      $('nameArea0').classList.remove('singles');
+      $('nameArea1').classList.remove('singles');
+      nameRow0b.style.display = 'flex';
+      nameRow1b.style.display = 'flex';
+
+      if (sw) {
+        // side0 shows Team B
+        name0a.textContent = state.players[2].name;
+        name0b.textContent = state.players[3].name;
+        // side1 shows Team A
+        name1a.textContent = state.players[0].name;
+        name1b.textContent = state.players[1].name;
+      } else {
+        // side0 shows Team A
+        name0a.textContent = state.players[0].name;
+        name0b.textContent = state.players[1].name;
+        // side1 shows Team B
+        name1a.textContent = state.players[2].name;
+        name1b.textContent = state.players[3].name;
+      }
+    } else {
+      // Singles: hide second rows, use row layout
+      $('nameArea0').classList.add('singles');
+      $('nameArea1').classList.add('singles');
+      nameRow0b.style.display = 'none';
+      nameRow1b.style.display = 'none';
+
+      if (sw) {
+        name0a.textContent = state.players[2].name;
+        name1a.textContent = state.players[0].name;
+      } else {
+        name0a.textContent = state.players[0].name;
+        name1a.textContent = state.players[2].name;
+      }
+    }
+
+    // Serve / Receive badges
+    updateServeBadges(isDoubles, sw, teamAPlayerA, teamAPlayerB, teamBPlayerA, teamBPlayerB);
+
+    // Serve area (team-level serve indicator)
+    updateServeArea(isDoubles, sw);
+
+    // Game dots
+    var dots = gameDots.querySelectorAll('.game-dot');
+    dots.forEach(function(dot, i) {
+      dot.classList.remove('win-p1', 'win-p2', 'current');
+      var winner = state.gameResults[i];
+      if (winner === 0 || winner === 1) {
+        // Team A won (winner is 0 or 1 for team A players)
+        if (sw) dot.classList.add('win-p2');
+        else dot.classList.add('win-p1');
+      } else if (winner === 2 || winner === 3) {
+        // Team B won
+        if (sw) dot.classList.add('win-p1');
+        else dot.classList.add('win-p2');
+      } else if (i === state.currentGame - 1 && !state.matchOver && !state.gamePaused) {
+        dot.classList.add('current');
+      }
+    });
+
+    if (state.matchOver) {
+      statusBadge.textContent = '比赛结束';
+      statusBadge.className = 'status-badge over';
+    } else if (state.gamePaused) {
+      statusBadge.textContent = '本局结束';
+      statusBadge.className = 'status-badge over';
+    } else {
+      var modeLabel = isDoubles ? ' [双]' : '';
+      statusBadge.textContent = '第' + state.currentGame + '局' + modeLabel;
+      statusBadge.className = 'status-badge live';
+    }
+
+    if (state.matchOver || state.gamePaused || !state.winScore) {
+      side0.style.pointerEvents = 'none';
+      side1.style.pointerEvents = 'none';
+    } else {
+      side0.style.pointerEvents = 'auto';
+      side1.style.pointerEvents = 'auto';
+    }
+  }
+
+  function updateServeBadges(isDoubles, sw, tA_A, tA_B, tB_A, tB_B) {
+    // Reset all badges
+    [serveBadge0a, serveBadge0b, serveBadge1a, serveBadge1b].forEach(function(b) {
+      b.classList.remove('active-server', 'active-receiver');
+      b.textContent = '';
+    });
+
+    if (!isDoubles) {
+      // Singles: no individual badges, team-level serve area handles it
+      return;
+    }
+
+    // Doubles: show 🏸 on active server, 🛡️ on active receiver
+    var server = state.activeServer;
+    var receiver = state.activeReceiver;
+
+    // Map player index to badge element
+    var badgeMap = {};
+    if (sw) {
+      // side0 = Team B, side1 = Team A
+      badgeMap[0] = serveBadge1a;
+      badgeMap[1] = serveBadge1b;
+      badgeMap[2] = serveBadge0a;
+      badgeMap[3] = serveBadge0b;
+    } else {
+      badgeMap[0] = serveBadge0a;
+      badgeMap[1] = serveBadge0b;
+      badgeMap[2] = serveBadge1a;
+      badgeMap[3] = serveBadge1b;
+    }
+
+    if (server !== null && badgeMap[server]) {
+      badgeMap[server].classList.add('active-server');
+      badgeMap[server].textContent = '🏸';
+    }
+    if (receiver !== null && badgeMap[receiver]) {
+      badgeMap[receiver].classList.add('active-receiver');
+      badgeMap[receiver].textContent = '🛡️';
+    }
+  }
+
+  function updateServeArea(isDoubles, sw) {
+    // Team-level serve indicator: which team is serving and from which court
+    if (isDoubles) {
+      var server = state.activeServer;
+      var servingTeamSide = (server < 2) ? 'A' : 'B';
+
+      var displaySide = -1;
+      if (servingTeamSide === 'A') displaySide = sw ? 1 : 0;
+      else displaySide = sw ? 0 : 1;
+
+      if (displaySide === 0) {
+        serve0.className = 'serve-area serve-active';
+        serve1.className = 'serve-area serve-inactive';
+        court0.textContent = getServeCourt(server);
+        court1.textContent = '';
+      } else {
+        serve0.className = 'serve-area serve-inactive';
+        serve1.className = 'serve-area serve-active';
+        court0.textContent = '';
+        court1.textContent = getServeCourt(server);
+      }
+    } else {
+      var sv = state.servingPlayer;
+      var displayServingSide;
+      if (sv === 0) displayServingSide = sw ? 1 : 0;
+      else displayServingSide = sw ? 0 : 1;
+
+      if (displayServingSide === 0) {
+        serve0.className = 'serve-area serve-active';
+        serve1.className = 'serve-area serve-inactive';
+        court0.textContent = getServeCourt(sv);
+        court1.textContent = '';
+      } else {
+        serve0.className = 'serve-area serve-inactive';
+        serve1.className = 'serve-area serve-active';
+        court0.textContent = '';
+        court1.textContent = getServeCourt(sv);
+      }
+    }
+  }
+
+  // ── Wake Lock ──────────────────────────────────
+  var wakeLock = null;
+
+  async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', function() { wakeLock = null; });
+    } catch(e) { /* not supported */ }
+  }
+
+  async function reacquireWakeLock() {
+    if (wakeLock === null && document.visibilityState === 'visible') {
+      await requestWakeLock();
+    }
+  }
+
+  function isAnyOverlayActive() {
+    return !!document.querySelector(
+      '.modal-overlay.active, .gamewin-overlay.active, .history-overlay.active, ' +
+      '.victory-overlay.active, .about-overlay.active, .mode-overlay.active, ' +
+      '.scoring-overlay.active, .doubles-type-overlay.active, .serve-setup-overlay.active, ' +
+      '.recovery-overlay.active, .sponsor-overlay.active, .guide-overlay.active'
+    );
+  }
+
+  // ── Event Bindings ─────────────────────────────
+  side0.addEventListener('click', function(e) {
+    addPoint(state.isSwapped ? 1 : 0);
+  });
+  side1.addEventListener('click', function(e) {
+    addPoint(state.isSwapped ? 0 : 1);
+  });
+
+  // Player name edit handlers — map display row to state.players index
+  function makeEditHandler(playerIdx) {
+    return function(e) {
+      e.stopPropagation();
+      editPlayerName(playerIdx);
+    };
+  }
+
+  // Side 0 (left display) - click handlers depend on isSwapped
+  // row a: when not swapped = player[0], when swapped = player[2]
+  // row b: when not swapped = player[1], when swapped = player[3]
+  name0a.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 2 : 0);
+  });
+  edit0a.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 2 : 0);
+  });
+  name0b.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 3 : 1);
+  });
+  edit0b.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 3 : 1);
+  });
+
+  // Side 1 (right display)
+  name1a.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 0 : 2);
+  });
+  edit1a.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 0 : 2);
+  });
+  name1b.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 1 : 3);
+  });
+  edit1b.addEventListener('click', function(e) {
+    e.stopPropagation();
+    editPlayerName(state.isSwapped ? 1 : 3);
+  });
+
+  $('undoBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    undo();
+  });
+
+  $('switchBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (!state.winScore) return;
+    if (state.matchOver) return;
+    if (state.gamePaused) return;
+    switchSides();
+  });
+
+  $('resetGameBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (!state.winScore) return;
+    if (state.matchOver) return;
+    if (state.gamePaused) return;
+    if (getTeamAPoints() === 0 && getTeamBPoints() === 0) return;
+    showModal('⚠️', '重置本局', '确定要重置当前局的比分吗？此操作不会影响大局胜负。',
+      '确认重置', 'confirm', resetGame);
+  });
+
+  $('resetMatchBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    showModal('⚠️', '重置整场比赛', '确定要重置整场比赛吗？所有比分和胜负记录将被清除。',
+      '确认重置', 'confirm', resetMatch);
+  });
+
+  // Modal
+  modalCancel.addEventListener('click', hideModal);
+  modalConfirm.addEventListener('click', function() {
+    if (modalCallback) modalCallback();
+    hideModal();
+  });
+  modalOverlay.addEventListener('click', function(e) {
+    if (e.target === modalOverlay) hideModal();
+  });
+
+  // Game win modal
+  gamewinBtn.addEventListener('click', function() {
+    advanceToNextGame();
+  });
+
+  gamewinUndoBtn.addEventListener('click', function() {
+    undo();
+  });
+
+  // History
+  $('historyOpenBtn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    openHistory();
+  });
+
+  $('historyCloseBtn').addEventListener('click', closeHistory);
+  $('historyCloseBtn2').addEventListener('click', closeHistory);
+  $('detailCloseBtn').addEventListener('click', closeHistory);
+  $('detailBackBtn').addEventListener('click', backToHistoryList);
+  $('historyBackMainBtn').addEventListener('click', backToMatchList);
+
+  chartToggleBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleChart();
+  });
+
+  chartExportBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    exportChart();
+  });
+
+  historyOverlay.addEventListener('click', function(e) {
+    if (e.target === historyOverlay) closeHistory();
+  });
+
+  // Victory
+  $('victoryBtn').addEventListener('click', function() {
+    hideVictory();
+    resetMatch();
+  });
+
+  victoryUndoBtn.addEventListener('click', function() {
+    undo();
+  });
+
+  // Recovery prompt
+  recoveryResumeBtn.addEventListener('click', resumeMatch);
+  recoveryClearBtn.addEventListener('click', clearAndStartNew);
+
+  // Scoring system selection
+  scoring21Btn.addEventListener('click', function() {
+    selectScoring(21);
+  });
+
+  scoring15Btn.addEventListener('click', function() {
+    selectScoring(15);
+  });
+
+  // Doubles type selection
+  doublesTypeMenBtn.addEventListener('click', function() {
+    selectDoublesType('men');
+  });
+
+  doublesTypeWomenBtn.addEventListener('click', function() {
+    selectDoublesType('women');
+  });
+
+  doublesTypeMixedBtn.addEventListener('click', function() {
+    selectDoublesType('mixed');
+  });
+
+  // About / Contact
+  aboutOpenBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    aboutOverlay.classList.add('active');
+  });
+
+  aboutCloseBtn.addEventListener('click', function() {
+    aboutOverlay.classList.remove('active');
+  });
+
+  aboutOverlay.addEventListener('click', function(e) {
+    if (e.target === aboutOverlay) aboutOverlay.classList.remove('active');
+  });
+
+  // Guide / Instructions
+  function openGuide(e) {
+    e.stopPropagation();
+    guideOverlay.classList.add('active');
+  }
+
+  guideOpenBtn.addEventListener('click', openGuide);
+  aboutGuideBtn.addEventListener('click', openGuide);
+
+  guideCloseBtn.addEventListener('click', function() {
+    guideOverlay.classList.remove('active');
+  });
+
+  guideOverlay.addEventListener('click', function(e) {
+    if (e.target === guideOverlay) guideOverlay.classList.remove('active');
+  });
+
+  // Sponsor / Support
+  function showSponsor() {
+    sponsorOverlay.classList.add('active');
+  }
+
+  function hideSponsor() {
+    sponsorOverlay.classList.remove('active');
+  }
+
+  gamewinSponsorBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    showSponsor();
+  });
+
+  victorySponsorBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    showSponsor();
+  });
+
+  sponsorCloseBtn.addEventListener('click', hideSponsor);
+
+  sponsorOverlay.addEventListener('click', function(e) {
+    if (e.target === sponsorOverlay) hideSponsor();
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    if (e.target.isContentEditable || e.target.tagName === 'INPUT') return;
+    if (isAnyOverlayActive()) return;
+    switch(e.key.toLowerCase()) {
+      case 'a': case 'q': addPoint(state.isSwapped ? 1 : 0); break;
+      case 'l': case 'p': addPoint(state.isSwapped ? 0 : 1); break;
+      case 'z': undo(); break;
+      case 's': switchSides(); break;
+    }
+  });
+
+  document.addEventListener('visibilitychange', reacquireWakeLock);
+
+  document.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+  }, { passive: false });
+
+  // ── Init ───────────────────────────────────────
+  function init() {
+    var restored = loadState();
+
+    if (!restored) {
+      // First-ever open: mode selection → scoring selection
+      render();
+      showModeSelection(function(mode) {
+        showScoringSelection(function(winScore) {
+          state.winScore = winScore;
+          saveState();
+          render();
+          requestWakeLock();
+        });
+      });
+      return;
+    }
+
+    // Data was loaded — render it and decide whether to show recovery prompt
+    render();
+
+    if (!hasExistingData()) {
+      if (!state.mode) {
+        showModeSelection(function(mode) {
+          if (!state.winScore) {
+            showScoringSelection(function(winScore) {
+              state.winScore = winScore;
+              saveState();
+              render();
+              requestWakeLock();
+            });
+          } else {
+            saveState();
+            render();
+            requestWakeLock();
+          }
+        });
+        return;
+      }
+      if (!state.winScore) {
+        showScoringSelection(function(winScore) {
+          state.winScore = winScore;
+          saveState();
+          render();
+          requestWakeLock();
+        });
+        return;
+      }
+      requestWakeLock();
+      return;
+    }
+
+    // Meaningful data found — show recovery prompt
+    showRecoveryPrompt();
+
+    if (state.matchOver) {
+      var winner = getTeamAGames() >= 2 ? 0 : 2;
+      showVictory(winner);
+    } else if (state.gamePaused) {
+      var winner = state.gameResults[state.currentGame - 1];
+      showGameWin(winner);
+    }
+  }
+
+  // Mode selection button handlers
+  modeSinglesBtn.addEventListener('click', function() {
+    selectMode('singles');
+  });
+
+  modeDoublesBtn.addEventListener('click', function() {
+    showDoublesTypeSelection(function(doublesType) {
+      selectMode('doubles');
+    });
+  });
+
+  // ── Back Button Handlers ─────────────────────────
+  // Shared helpers for re-building the callback chain on back-navigation
+  function makeScoringCallback() {
+    return function(winScore) {
+      state.winScore = winScore;
+      saveState();
+      render();
+      requestWakeLock();
+    };
+  }
+
+  function makeModeCallback() {
+    return function(mode) {
+      showScoringSelection(makeScoringCallback());
+    };
+  }
+
+  scoringBackBtn.addEventListener('click', function() {
+    hideScoringSelection();
+    state.winScore = null;
+    if (state.mode === 'doubles') {
+      modeSelectionCallback = makeModeCallback();
+      showDoublesTypeSelection(function(doublesType) {
+        selectMode('doubles');
+      });
+    } else {
+      state.mode = null;
+      showModeSelection(makeModeCallback());
+    }
+  });
+
+  doublesTypeBackBtn.addEventListener('click', function() {
+    hideDoublesTypeSelection();
+    state.mode = null;
+    showModeSelection(makeModeCallback());
+  });
+
+  // ── Serve Setup (Doubles) Handlers ───────────────
+  serveSetupBackBtn.addEventListener('click', function() {
+    var cb = serveSetupScoringCallback;
+    hideServeSetup();
+    state.winScore = null;
+    showScoringSelection(cb);
+  });
+
+  serveSetupOverlay.addEventListener('click', function(e) {
+    if (e.target === serveSetupOverlay) {
+      var cb = serveSetupScoringCallback;
+      hideServeSetup();
+      state.winScore = null;
+      showScoringSelection(cb);
+    }
+  });
+
+  quickStartBtn.addEventListener('click', function() {
+    var cb = serveSetupScoringCallback;
+    if (!cb) return;
+
+    // Default: A1 (index 0) serves to B1 (index 2)
+    state.activeServer = 0;
+    state.activeReceiver = 2;
+    state.servingPlayer = 0;
+    state.positions = ['right', 'left', 'right', 'left'];
+
+    hideServeSetup();
+    cb(state.winScore);
+  });
+
+  startDoublesMatchBtn.addEventListener('click', function() {
+    var cb = serveSetupScoringCallback;
+    if (!cb) return;
+
+    var server = serveSetupSelectedServer;
+    var receiver = serveSetupSelectedReceiver;
+
+    // Validate: both must be selected
+    if (server === null || receiver === null) {
+      alert('请分别选择一名首发球员和一名首接球员。');
+      return;
+    }
+
+    // Validate: server and receiver must be on different teams
+    var serverTeam = server < 2 ? 0 : 1;
+    var receiverTeam = receiver < 2 ? 0 : 1;
+    if (serverTeam === receiverTeam) {
+      alert('首发球员和首接球员必须属于不同队伍！\n\nA队：' + state.players[0].name + '、' + state.players[1].name + '\nB队：' + state.players[2].name + '、' + state.players[3].name);
+      return;
+    }
+
+    // Apply serve/receive assignments
+    state.activeServer = server;
+    state.activeReceiver = receiver;
+
+    // Position derivation: score is 0:0 (even), so server & receiver stand on right
+    state.positions = ['left', 'left', 'left', 'left'];
+    state.positions[server] = 'right';
+    state.positions[receiver] = 'right';
+    // Note: teammates remain 'left' (set above)
+
+    // servingPlayer = the serving team's first player (0 for Team A, 2 for Team B)
+    state.servingPlayer = server < 2 ? 0 : 2;
+
+    hideServeSetup();
+    cb(state.winScore);
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>
